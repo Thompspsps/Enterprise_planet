@@ -3,7 +3,7 @@ pub enum PlanetType {
     A, B, C, D
 }
 pub struct EnergyCell {
-    charged: bool,
+    charge: bool,
 }
 pub trait Planetselfinfo {
     fn get_name(&self) -> &'static str;
@@ -14,20 +14,20 @@ pub trait Planetselfinfo {
 pub struct Rocket;
 impl EnergyCell {
     pub fn new() -> Self {
-        Self { charged: false }
+        Self { charge: false }
     }
 
     pub fn is_charged(&self) -> bool {
-        self.charged
+        self.charge
     }
 
     pub fn charge(&mut self) {
-        self.charged = true;
+        self.charge = true;
     }
 
     pub fn discharge(&mut self) -> Result<(), String> {
-        if self.charged {
-            self.charged = false;
+        if self.charge {
+            self.charge = false;
             Ok(())
         } else {
             Err("the cell is not charged".to_string())
@@ -92,7 +92,7 @@ impl Planetself {
         self.id
     }
 
-    pub fn charged_by_sunray(&mut self) {
+    pub fn charge_by_sunray(&mut self) {
         for cell in &mut self.energy_cells {
             if !cell.is_charged() {
                 cell.charge();
@@ -189,5 +189,6 @@ impl Planetselfinfo for EnterprisePlanet {
         self.combination_rule.clone()
     }
 }
+
 
 
