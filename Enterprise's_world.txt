@@ -124,8 +124,8 @@ pub fn build_rocket(&mut self) -> Result<(), String> {
         }
         else{
             
-                if self.cell.is_charged() {
-                    match Rocket::new(cell) {
+                if self.energy_cell.is_charged() {
+                    match Rocket::new(self.energy_cell) {
                         Ok(rocket) => {
                             self.rocket = Some(rocket);
                             return Ok(());
@@ -228,6 +228,7 @@ impl Planetselfinfo for EnterprisePlanet {
     fn get_combination_rule(&self) -> Vec<ComplexRscType> {       self.combination_rule.clone()
     }
 }
+
 
 
 
