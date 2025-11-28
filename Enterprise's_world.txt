@@ -98,15 +98,10 @@ impl EnergyCell {
         }
     }
 }
-
-impl Rocket{
-
 impl Rocket {
-    pub fn new(energy_cell: &mut EnergyCell) -> Result<Rocket, String> {
-        energy_cell.discharge().map(|_| Rocket { _private: () })
+    pub fn new(energy_cell: &mut EnergyCell) -> Result<Rocket, String> {       energy_cell.discharge().map(|_| Rocket { _private: () })
     }
 }
-
 impl Planetself {
     pub fn new(id: u32) -> Self {
         Self {
@@ -241,6 +236,7 @@ impl Planetselfinfo for EnterprisePlanet {
     fn get_combination_rule(&self) -> Vec<ComplexRscType> {       self.combination_rule.clone()
     }
 }
+
 
 
 
