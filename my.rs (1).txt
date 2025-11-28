@@ -5,13 +5,13 @@ pub enum PlanetType {
 pub struct EnergyCell {
     charge: bool,
 }
+pub struct Rocket;
 pub trait Planetselfinfo {
     fn get_name(&self) -> &'static str;
     fn get_planet_type(&self) -> PlanetType;
     fn get_generation_rule(&self) -> Vec<BasicRscType>;
     fn get_combination_rule(&self) -> Vec<ComplexRscType>;
-}
-pub struct Rocket;
+}
 impl EnergyCell {
     pub fn new() -> Self {
         Self { charge: false }
