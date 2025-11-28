@@ -31,7 +31,7 @@ pub enum ComplexRscType {
 
 pub struct Planetself {
     pub id: u32,
-    pub energy_cells: Vec<EnergyCell>,
+    pub energy_cell: EnergyCell,
     pub rocket: Option<Rocket>,
 }
 
@@ -107,7 +107,7 @@ impl Planetself {
     pub fn new(id: u32) -> Self {
         Self {
             id,
-            energy_cells: vec![EnergyCell::new()], 
+            energy_cell: EnergyCell::new(), 
             rocket: None,
         }
     }
@@ -116,24 +116,15 @@ impl Planetself {
     }
 
     pub fn charge_by_sunray(&mut self) {
-        for cell in &mut self.energy_cells {
-            if !cell.is_charged() {
-                cell.charge();
-                break;
-            }
-        }
-    }
-    pub fn number_of_cells(&self, number: usize) -> bool {
-        self.energy_cells.iter().filter(|c| c.is_charged()).count() >= number
-    }
-
-    pub fn build_rocket(&mut self) -> Result<(), String> {
+        self.energy_cell.charge();}
+   
+pub fn build_rocket(&mut self) -> Result<(), String> {
         if self.rocket.is_some() {
             return Err("you have had the rocket".to_string());
         }
         else{
-            for cell in &mut self.energy_cells {
-                if cell.is_charged() {
+            
+                if self.cell.is_charged() {
                     match Rocket::new(cell) {
                         Ok(rocket) => {
                             self.rocket = Some(rocket);
@@ -237,6 +228,7 @@ impl Planetselfinfo for EnterprisePlanet {
     fn get_combination_rule(&self) -> Vec<ComplexRscType> {       self.combination_rule.clone()
     }
 }
+
 
 
 
