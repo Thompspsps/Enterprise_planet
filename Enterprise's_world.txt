@@ -8,7 +8,8 @@ pub enum PlanetType {
 pub struct EnergyCell {
     charge: bool,
 }
-pub struct Rocket;
+pub struct Rocket {
+    _private: ()}
 
 #[derive(Debug, Clone, Copy)]
 pub enum BasicRscType {
@@ -99,22 +100,10 @@ impl EnergyCell {
 }
 
 impl Rocket{
-    fn build_rocket(&mut self) -> Result<(), String> {
-        if self.rocket.is_some() {
-            return Err("you have the rocket".to_string());
-        }
-        for cell in &mut self.energy_cells {
-            if cell.is_charged() {
-                match Rocket::new(cell) {
-                    Ok(rocket) => {
-                        self.rocket = Some(rocket);
-                        return Ok(());
-                    }
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-        Err("you need energy cells".to_string())
+
+impl Rocket {
+    pub fn new(energy_cell: &mut EnergyCell) -> Result<Rocket, String> {
+        energy_cell.discharge().map(|_| Rocket { _private: () })
     }
 }
 
@@ -252,6 +241,7 @@ impl Planetselfinfo for EnterprisePlanet {
     fn get_combination_rule(&self) -> Vec<ComplexRscType> {       self.combination_rule.clone()
     }
 }
+
 
 
 
