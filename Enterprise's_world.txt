@@ -43,6 +43,8 @@ pub struct EnterprisePlanet {
     combination_rule: Vec<ComplexRscType>,
 }
 
+pub struct AI;
+
 pub struct Planet<T: PlanetAI> {
     state: Planetself,
     planet_type: PlanetType,
@@ -100,6 +102,11 @@ impl EnergyCell {
 }
 impl Rocket {
     pub fn new(energy_cell: &mut EnergyCell) -> Result<Rocket, String> {       energy_cell.discharge().map(|_| Rocket { _private: () })
+    }
+}
+impl AI {
+    pub fn new() -> Self {
+        AI
     }
 }
 impl Planetself {
@@ -236,6 +243,7 @@ impl Planetselfinfo for EnterprisePlanet {
     fn get_combination_rule(&self) -> Vec<ComplexRscType> {       self.combination_rule.clone()
     }
 }
+
 
 
 
