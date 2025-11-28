@@ -181,9 +181,8 @@ pub enum PlanetToOrchestrator {
     StopWorldAIResult { planet_id: u32, timestamp: u32 }
 }
 
-//The following are copied from document protocol 
+//The following 2 enums of messaging are copied from document protocol 
 pub enum explorerToWorld {
-
 SupportedResourceRequest,
 
 SupportedCombinationRequest,
@@ -253,6 +252,7 @@ impl Planetselfinfo for EnterprisePlanet {
     fn get_combination_rule(&self) -> Vec<ComplexRscType> {       self.combination_rule.clone()
     }
 }
+
 
 
 
