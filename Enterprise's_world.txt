@@ -216,6 +216,8 @@ ComplexRscType::AIPartner => "Robot + Diamond = AIPartner",
             }
         }).collect()
     }
+
+
     pub fn combination_rule(&self) -> &[ComplexRscType] {
         &self.combination_rule
     }
@@ -225,18 +227,18 @@ impl Planetselfinfo for EnterprisePlanet {
         self.name
     }
 
+
     fn get_planet_type(&self) -> PlanetType {
         PlanetType::C
     }
-
     fn get_generation_rule(&self) -> Vec<BasicRscType> {
         vec![self.generation_rule]
     }
 
-    fn get_combination_rule(&self) -> Vec<ComplexRscType> {
-        self.combination_rule.clone()
+    fn get_combination_rule(&self) -> Vec<ComplexRscType> {       self.combination_rule.clone()
     }
 }
+
 
 
 
