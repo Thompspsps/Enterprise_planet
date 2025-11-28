@@ -79,15 +79,12 @@ impl EnergyCell {
     pub fn new() -> Self {
         Self { charge: false }
     }
-
     pub fn is_charged(&self) -> bool {
         self.charge
     }
-
     pub fn charge(&mut self) {
         self.charge = true;
     }
-
     pub fn discharge(&mut self) -> Result<(), String> {
         if self.charge {
             self.charge = false;
@@ -97,12 +94,12 @@ impl EnergyCell {
         }
     }
 }
+
 impl Rocket{
     fn build_rocket(&mut self) -> Result<(), String> {
         if self.rocket.is_some() {
             return Err("you have the rocket".to_string());
         }
-
         for cell in &mut self.energy_cells {
             if cell.is_charged() {
                 match Rocket::new(cell) {
@@ -114,11 +111,9 @@ impl Rocket{
                 }
             }
         }
-
         Err("you need energy cells".to_string())
     }
 }
-
 
 impl Planetself {
     pub fn new(id: u32) -> Self {
@@ -215,10 +210,9 @@ impl EnterprisePlanet {
             match rule {
                 ComplexRscType::Water => "Hydrogen + Oxygen = Water",
                 ComplexRscType::Diamond => "Carbon + Carbon = Diamond",
-                ComplexRscType::Life => "Water + Carbon = Life",
-                ComplexRscType::Robot => "Silicon + Life = Robot",
-                ComplexRscType::Dolphin => "Water + Life =Dolphin",
-                ComplexRscType::AIPartner => "Robot + Diamond = AIPartner",
+                ComplexRscType::Life => "Water + Carbon = Life",              ComplexRscType::Robot => "Silicon + Life = Robot",               ComplexRscType::Dolphin => "Water + Life =Dolphin",  
+
+ComplexRscType::AIPartner => "Robot + Diamond = AIPartner",
             }
         }).collect()
     }
@@ -243,6 +237,7 @@ impl Planetselfinfo for EnterprisePlanet {
         self.combination_rule.clone()
     }
 }
+
 
 
 
