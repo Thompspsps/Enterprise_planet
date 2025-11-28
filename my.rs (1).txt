@@ -110,7 +110,6 @@ impl Rocket{
 }
 
 
-
 impl Planetself {
     pub fn new(id: u32) -> Self {
         Self {
@@ -160,6 +159,27 @@ impl Planetself {
     }
 }
 
+pub enum OrchestratorToPlanet {
+    Sunray,
+    Asteroid,
+    StartPlanetAI,
+    StopPlanetAI,
+}
+
+pub enum PlanetToOrchestrator {
+    SunrayAck { planet_id: u32, timestamp: SystemTime },
+    AsteroidAck { planet_id: u32, rocket: Option<Rocket> },
+}
+
+pub enum ExplorerToPlanet {
+    SupportedResourceRequest { explorer_id: u32 },
+    AvailableEnergyCellRequest { explorer_id: u32 },
+}
+
+pub enum PlanetToExplorer {
+    SupportedResourceResponse { resource_list: Option<Vec<BasicRscType>> },
+    AvailableEnergyCellResponse { available_cells: u32 },
+}
 
 impl EnterprisePlanet {
     pub fn new(
@@ -213,6 +233,7 @@ impl Planetselfinfo for EnterprisePlanet {
         self.combination_rule.clone()
     }
 }
+
 
 
 
