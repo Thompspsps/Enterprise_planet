@@ -177,16 +177,28 @@ pub enum OrchestratorToPlanet {
 pub enum PlanetToOrchestrator {
     SunrayAck { planet_id: u32, timestamp: SystemTime },
     AsteroidAck { planet_id: u32, rocket: Option<Rocket> },
+    StartWorldAiResult { planet_id: u32, timestamp: u32 },
+    StopWorldAIResult { planet_id: u32, timestamp: u32 }
 }
 
-pub enum ExplorerToPlanet {
-    SupportedResourceRequest { explorer_id: u32 },
-    AvailableEnergyCellRequest { explorer_id: u32 },
-}
+//The following are copied from document protocol 
+pub enum explorerToWorld {
 
-pub enum PlanetToExplorer {
-    SupportedResourceResponse { resource_list: Option<Vec<BasicRscType>> },
-    AvailableEnergyCellResponse { available_cells: u32 },
+SupportedResourceRequest,
+
+SupportedCombinationRequest,
+
+GenerateResourceRequest,
+
+CombineResourceRequest { first: &’static str, second: &’static str },
+EnergyCellRequest,
+}
+pub enum planetToExplorer {
+SupportedResourceResponse { ... },
+SupportedCombinationResponse { ... },
+GenerateResourceResponse { ... },
+CombineResourceResponse { ... },
+EnergyCellResponse { number: std::num::NonZeroUsize },
 }
 
 impl EnterprisePlanet {
@@ -241,6 +253,7 @@ impl Planetselfinfo for EnterprisePlanet {
     fn get_combination_rule(&self) -> Vec<ComplexRscType> {       self.combination_rule.clone()
     }
 }
+
 
 
 
