@@ -6,6 +6,39 @@ pub struct EnergyCell {
     charge: bool,
 }
 pub struct Rocket;
+
+#[derive(Debug, Clone, Copy)]
+pub enum BasicRscType {
+    Oxygen,
+    Hydrogen,
+    Carbon,
+    Silicon,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ComplexRscType {
+    Water,
+    Diamond,
+    Life,
+    Robot,
+    Dolphin,
+    AIPartner,
+}
+
+pub struct Planetself {
+    pub id: u32,
+    pub energy_cells: Vec<EnergyCell>,
+    pub rocket: Option<Rocket>,
+}
+
+#[derive(Debug)]
+pub struct EnterprisePlanet {
+    ai: AI,
+    name: &'static str,
+    generation_rule: BasicRscType,
+    combination_rule: Vec<ComplexRscType>,
+}
+
 pub trait Planetselfinfo {
     fn get_name(&self) -> &'static str;
     fn get_planet_type(&self) -> PlanetType;
@@ -54,31 +87,8 @@ impl Rocket{
 
         Err("you need energy cells".to_string())
     }
-}
+}
 
-#[derive(Debug, Clone, Copy)]
-pub enum BasicRscType {
-    Oxygen,
-    Hydrogen,
-    Carbon,
-    Silicon,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum ComplexRscType {
-    Water,
-    Diamond,
-    Life,
-    Robot,
-    Dolphin,
-    AIPartner,
-}
-
-pub struct Planetself {
-    pub id: u32,
-    pub energy_cells: Vec<EnergyCell>,
-    pub rocket: Option<Rocket>,
-}
 
 impl Planetself {
     pub fn new(id: u32) -> Self {
@@ -127,15 +137,7 @@ impl Planetself {
     pub fn use_rocket(&mut self) -> Option<Rocket> {
         self.rocket.take()
     }
-}
-
-#[derive(Debug)]
-pub struct EnterprisePlanet {
-    ai: AI,
-    name: &'static str,
-    generation_rule: BasicRscType,
-    combination_rule: Vec<ComplexRscType>,
-}
+}
 
 impl EnterprisePlanet {
     pub fn new(
