@@ -44,7 +44,27 @@ pub trait Planetselfinfo {
     fn get_planet_type(&self) -> PlanetType;
     fn get_generation_rule(&self) -> Vec<BasicRscType>;
     fn get_combination_rule(&self) -> Vec<ComplexRscType>;
-}
+}
+
+pub trait PlanetAI {
+    fn handle_orchestrator_msg(
+        &mut self,
+        state: &mut Planetself,
+        msg: OrchestratorToPlanet
+    ) -> Option<PlanetToOrchestrator>;
+    fn handle_explorer_msg(
+        &mut self,
+        state: &mut Planetself,
+        msg: ExplorerToPlanet
+    ) -> Option<PlanetToExplorer>;
+    fn handle_asteroid(
+        &mut self,
+        state: &mut Planetself,
+    ) -> Option<Rocket>;
+    fn start(&mut self, state: &Planetself);
+    fn stop(&mut self);
+}
+
 impl EnergyCell {
     pub fn new() -> Self {
         Self { charge: false }
@@ -87,7 +107,8 @@ impl Rocket{
 
         Err("you need energy cells".to_string())
     }
-}
+}
+
 
 
 impl Planetself {
@@ -137,7 +158,8 @@ impl Planetself {
     pub fn use_rocket(&mut self) -> Option<Rocket> {
         self.rocket.take()
     }
-}
+}
+
 
 impl EnterprisePlanet {
     pub fn new(
@@ -191,6 +213,7 @@ impl Planetselfinfo for EnterprisePlanet {
         self.combination_rule.clone()
     }
 }
+
 
 
 
