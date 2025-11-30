@@ -1,36 +1,39 @@
-use common_game::components::{planet::Planet, sunray::Sunray};
+use common_game::components::planet;
+// use common_game::components::{planet::Planet, sunray::Sunray};
 #[allow(unused_imports)]
 use common_game::{
     components::{
-        planet::{PlanetState,PlanetAI},
+        planet::{Planet,PlanetState,PlanetAI,PlanetType},
         energy_cell::EnergyCell,
         rocket::Rocket,
-        resource,
+        sunray::Sunray,
+        resource::*,
     },
     protocols::{
-        messages::{ExplorerToPlanet,PlanetToExplorer,OrchestratorToPlanet,PlanetToOrchestrator},
+        messages::{
+            ExplorerToPlanet,
+            PlanetToExplorer,
+            OrchestratorToPlanet,
+            PlanetToOrchestrator
+        },
     }
 };
 
-use std::time::SystemTime;
+use std::{sync::mpsc, time::SystemTime};
 
 
-pub struct Enterprise_AI{
+pub struct EnterpriseAi{
     // for starting and stopping the planet ai
     is_running:bool
 }
 
-impl PlanetAI for Enterprise_AI{
+impl PlanetAI for EnterpriseAi{
     fn start(&mut self, state: &PlanetState) {
         self.is_running=true;
-        
-        todo!();
     }
 
     fn stop(&mut self) {
         self.is_running=false;
-
-        todo!();
     }
 
     fn handle_orchestrator_msg(
@@ -39,28 +42,47 @@ impl PlanetAI for Enterprise_AI{
             msg: OrchestratorToPlanet,
         ) -> Option<PlanetToOrchestrator> {
 
-        return match msg{
-            OrchestratorToPlanet::Asteroid(_)=>{
-                // self.handle_asteroid(state);
-                None
-            },
-            OrchestratorToPlanet::StartPlanetAI(_)=>{
-                Some(PlanetToOrchestrator::StartPlanetAIResult { planet_id: state.id(), timestamp: SystemTime::now() })
-            },
-            OrchestratorToPlanet::StopPlanetAI(_)=>{
-                Some(PlanetToOrchestrator::StopPlanetAIResult { planet_id: state.id(), timestamp: SystemTime::now() })
+
+        //return if self.is_running {
+            match msg{
+                OrchestratorToPlanet::Asteroid(_)=>{
+                    if self.is_running{
+                        self.try_build_rocket(state);        // maybe handle the result?
+                        Some(PlanetToOrchestrator::AsteroidAck { planet_id: state.id(), rocket:state.take_rocket()})
+                    }else{
+                        None
+                    }
+                },
+                OrchestratorToPlanet::StartPlanetAI(_)=>{
+                    self.start(state);
+                    Some(PlanetToOrchestrator::StartPlanetAIResult { planet_id: state.id(), timestamp: SystemTime::now() })
+                },
+                OrchestratorToPlanet::StopPlanetAI(_)=>{
+                    if self.is_running{
+                        self.stop();
+                        Some(PlanetToOrchestrator::StopPlanetAIResult { planet_id: state.id(), timestamp: SystemTime::now() })
+                    }else{
+                        None
+                    }   
+                }
+                OrchestratorToPlanet::Sunray(sunray)=>{
+                    if self.is_running{
+                        self.charge_energy_cell(state,sunray);
+                        self.try_build_rocket(state);       // handle returned value
+                        Some(PlanetToOrchestrator::SunrayAck { planet_id: state.id(), timestamp: SystemTime::now() })
+                    } else {
+                        None
+                    }
+                },
+                OrchestratorToPlanet::InternalStateRequest(_)=>{
+                    Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: state/* .clone*/, timestamp: SystemTime::now() })   //no clone trait for planetstate?????
+                    // None
+                },
             }
-            OrchestratorToPlanet::Sunray(sunray)=>{
-                self.charge_energy_cell(state, sunray);
-                // self.try_build_rocket(state);
-                Some(PlanetToOrchestrator::SunrayAck { planet_id: state.id(), timestamp: SystemTime::now() })
-            },
-            OrchestratorToPlanet::InternalStateRequest(_)=>{
-                // Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: state/* .clone*/, timestamp: SystemTime::now() })   //not clone trait for planetstate?????
-                None
-            },
-            _=>None
-        };
+        //}else{
+            //None
+        //}
+        
     }
 
 
@@ -86,12 +108,11 @@ impl PlanetAI for Enterprise_AI{
             ExplorerToPlanet::InternalStateRequest { explorer_id }=>None,
             ExplorerToPlanet::SupportedCombinationRequest { explorer_id }=>None,
             ExplorerToPlanet::SupportedResourceRequest { explorer_id }=>None,
-            _=>None
         } 
     }
 }
 
-impl Enterprise_AI{
+impl EnterpriseAi{
     pub fn new()->Self{
         // should be started by the orchestrator
         Self { is_running: false }
@@ -101,29 +122,52 @@ impl Enterprise_AI{
         state.cell_mut(0).charge(sunray);   //has only one cell
     }
 
-    // fn try_build_rocket(&self,state:&mut PlanetState)->bool{
-    //     if !state.has_rocket() {
-    //         if state.cell(0).is_charged() {
-    //             let cell=state.cell_mut(0);
-    //             if let Ok(_) = state.build_rocket(cell) {
-    //                 return true;
-    //             }
-    //         }
-
-    //     }
-    //     false
-    // }
+    fn try_build_rocket(&self,state:&mut PlanetState)->Result<(),String>{
+        if !state.has_rocket(){
+            if state.cell(0).is_charged(){
+                let cell=state.cell_mut(0);
+                match state.build_rocket(cell){
+                    Ok(_)=>Ok(()),
+                    Err(str)=>Err(str)
+                }
+            }else{
+                Err(String::from("Energy cell already depleted"))
+            }
+        }else{
+            Ok(())
+        }
+    }
 }
 
 
 use std::sync::mpsc::{Receiver,Sender};
 
-pub fn planet_genesis(
-    id:u32,
-    orchestratore_msg_channels:(Receiver<OrchestratorToPlanet>,Sender<PlanetToOrchestrator>),
-    explorer_msg_channels:(Receiver<ExplorerToPlanet>,Sender<PlanetToExplorer>)
-)->Result<Planet<Enterprise_AI>,String>{
-    Err("todo".to_string())
+pub fn create_planet(
+    rx_orchestrator: Receiver<OrchestratorToPlanet>,
+    tx_orchestrator: Sender<PlanetToOrchestrator>,
+    rx_explorer: Receiver<ExplorerToPlanet>,
+    tx_explorer: Sender<PlanetToExplorer>
+)->Planet<EnterpriseAi>{
+    let id=67; // huhhhhhhhhhhhhhh
+    let ai=EnterpriseAi::new();
+    let gen_rules=vec![BasicResourceType::Carbon];
+    let comb_rules=vec![
+        ComplexResourceType::Diamond,
+        ComplexResourceType::Life
+    ];
+
+    match Planet::new(
+        id,
+        PlanetType::C,
+        ai,
+        gen_rules,  // basic resources
+        comb_rules, // combinator
+        (rx_orchestrator,tx_orchestrator),
+        (rx_explorer,tx_explorer)
+    ){
+        Ok(planet)=>planet,
+        Err(error)=>panic!("{error}")
+    }
 }
 
 #[cfg(test)]
