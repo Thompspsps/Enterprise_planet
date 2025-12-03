@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-// use common_game::components::planet;
-// use common_game::components::{planet::Planet, sunray::Sunray};
-
 #[allow(unused_imports)]
 use common_game::{
     components::{
