@@ -16,19 +16,29 @@ use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::SystemTime;
 
+//Note: I am not really sure how to handle the Result<(), String> of many functions
+//Should we keep track of the errors somewhere?
+//Examples: build_rocket(), ...
+
+
+//AI of the planet Enterprise
 pub struct EnterpriseAi {
-    // for starting and stopping the planet ai
-    running: bool, // how about parameters like prioritizing rockets construction(always or only when needed), ecc ....
+    // This parameter the current state of the AI
+    running: bool,
+    // This parameter represents how many explorers are on the planet
+    num_explorers: u8,
 }
 
 impl PlanetAI for EnterpriseAi {
     fn start(&mut self, state: &PlanetState) {
+        // Setting the planet parameters
         self.running = true;
-        // can add some initialization logic here (we have planet state after all)
+        self.num_explorers = 0; //No explorers when the planet is created
     }
 
     fn stop(&mut self, state: &PlanetState) {
         self.running = false;
+        self.num_explorers = 0; //They are all dead
     }
 
     fn handle_orchestrator_msg(
@@ -58,17 +68,10 @@ impl PlanetAI for EnterpriseAi {
                 })
             }
             OrchestratorToPlanet::Asteroid(asteroid) => {
-                // if self.running{
-                //     self.try_build_rocket(state);        // maybe handle the result?
-                //     Some(PlanetToOrchestrator::AsteroidAck { planet_id: state.id(), rocket:state.take_rocket()})
-                // }else{
-                //     None
-                // }
-                //None        // <----- am i missing something or there is the handle_asteroid for this
                 Some(PlanetToOrchestrator::AsteroidAck {
                     planet_id: state.id(),
                     rocket: self.handle_asteroid(state, generator, combinator),
-                }) // to review
+                }) // to review -> I think it is okay, all the logic is done in handle_asteroid
             }
             OrchestratorToPlanet::StopPlanetAI => {
                 self.stop(state);
@@ -77,36 +80,53 @@ impl PlanetAI for EnterpriseAi {
                 })
             }
             OrchestratorToPlanet::Sunray(sunray) => {
-                self.charge_energy_cell(state, sunray);
-                let _ = self.try_build_rocket(state); // handle result value
+                state.charge_cell(sunray);
+
+                // If there are no explorers, the planet will prioritize self-defense
+                //Otherwise, it will store the energy cell for the explorers
+                if self.num_explorers == 0 {
+                    if self.has_charged_cells(state){ //build_rocket does all the checks except if the energy cell is charged (even if the comment on the code says otherwise)
+                        state.build_rocket(0);
+                    }
+                }
+
+                //Return acknowledgement
                 Some(PlanetToOrchestrator::SunrayAck {
                     planet_id: state.id(),
                 })
             }
             OrchestratorToPlanet::InternalStateRequest => {
-                // let out=PlanetState::clone(state);
-                // Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: PlanetState::clone(state), timestamp: SystemTime::now() })   //no clone trait for planetstate?????
+                //Problem: No copy/clone trait for PlanetState
+                //There is already an issue about it on GitHub
+
+                //let out=PlanetState::clone(state);
+                //Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: PlanetState::clone(state)})
                 None
             }
             OrchestratorToPlanet::IncomingExplorerRequest {
                 explorer_id,
                 new_mpsc_sender,
             } => {
+
+                //Explorer coming to the planet, increase counter
+                self.num_explorers += 1;
+
                 Some(PlanetToOrchestrator::IncomingExplorerResponse {
                     planet_id: state.id(),
-                    res: Ok(()),
-                }) // ????
+                    res: Ok(()), // This is a Result<(), String>, I didn't understand in which cases an explorer wouldn't be accepted
+                })
             }
             OrchestratorToPlanet::OutgoingExplorerRequest { explorer_id } => {
+
+                //Explorer exiting the planet, decrease counter
+                self.num_explorers -= 1;
+
                 Some(PlanetToOrchestrator::OutgoingExplorerResponse {
                     planet_id: state.id(),
-                    res: Ok(()),
+                    res: Ok(()), // This is a Result<(), String>, I didn't understand in which cases an explorer wouldn't be allowed to go out
                 })
             }
         };
-        //}else{
-        //None
-        //}
     }
 
     fn handle_asteroid(
@@ -115,38 +135,18 @@ impl PlanetAI for EnterpriseAi {
         generator: &Generator,
         combinator: &Combinator,
     ) -> Option<Rocket> {
-        // match state.take_rocket(){
-        // Some(rocket)=>Some(rocket),
-        // None=>{
-        //     self.try_build_rocket(state);
-        //     state.take_rocket()
-        // }
-        // }
+        if !self.is_running() { return None; }
 
-        if !self.is_running() {
-            return None;
-        }
+        //This function tries to take a rocket from the planet
+        //If there is no rocket, it tries to build one
+        //If this does not work, it returns None
 
-        if let Some(rocket) = state.take_rocket() {
-            return Some(rocket);
-        }
-
-        // if !state.can_have_rocket(){
-        //     return None;
-        // }
-
-        // self.try_build_rocket
-        if let Some((energy_cell, ix)) = state.full_cell() {
-            match state.build_rocket(ix) {
-                // try building an emergency rocket
-                Ok(_) => state.take_rocket(),
-                Err(err) => {
-                    eprintln!("Failed to build anemergency rocket: {err}");
-                    None
-                }
+        match state.take_rocket() {
+            Some(rocket) => { return Some(rocket) },
+            None => {
+                if self.has_charged_cells(state){state.build_rocket(0);}
+                return state.take_rocket();
             }
-        } else {
-            None
         }
     }
 
@@ -161,13 +161,13 @@ impl PlanetAI for EnterpriseAi {
             return None;
         }
 
-        //if self.running{
         match msg {
             ExplorerToPlanet::AvailableEnergyCellRequest { .. } => {
+                //Counts how many energy cells are charged (1 or 0 in our case)
                 let available = state
                     .cells_iter()
                     .filter(|energy_cell| energy_cell.is_charged())
-                    .count() as u32; // i know we need only to check if the first is charged
+                    .count() as u32; // i know we need only to check if the first is charged - Ok, that is more complete
                 Some(PlanetToExplorer::AvailableEnergyCellResponse {
                     available_cells: available,
                 })
@@ -177,13 +177,18 @@ impl PlanetAI for EnterpriseAi {
                     complex_response: self.handle_combine_request(msg, combinator, state),
                 })
             }
-            ExplorerToPlanet::GenerateResourceRequest {
-                explorer_id,
-                resource,
-            } => {
+            ExplorerToPlanet::GenerateResourceRequest { explorer_id, resource} => {
+                //Should we call a function like in the previous match (clearer code)
+                // Some(PlanetToExplorer::GenerateResourceResponse {
+                //     resource: self.handle_resource_request(msg, generator, state)
+                // })
+
+                //I also think that we could avoid that unnecessary check
+
                 if !generator.contains(resource) {
                     return Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
-                } else {
+                }
+                else {
                     if let Some((energy_cell, _)) = state.full_cell() {
                         let new_resource = match resource {
                             BasicResourceType::Carbon => generator
@@ -202,6 +207,7 @@ impl PlanetAI for EnterpriseAi {
                     }
                 }
             }
+            // Was this message removed in the recent versions? I can still see it in the common code
             // ExplorerToPlanet::InternalStateRequest { explorer_id }=>{
             //     Some(PlanetToExplorer::InternalStateResponse { planet_state: PlanetState::from(state) })
             // },
@@ -229,57 +235,23 @@ impl PlanetAI for EnterpriseAi {
                 })
             }
         }
-        // } else{
-        //     None
-        // }
     }
 }
 
+//Note: I deleted charge_energy_cell and try_build_rocket.
+//There were already functions that did the exact same thing, same checks...
+//If you disagree, we can discuss it and maybe implement it again
 impl EnterpriseAi {
     pub fn new() -> Self {
-        Self { running: false }
+        Self { running: false, num_explorers: 0 }
     }
-
     pub fn is_running(&self) -> bool {
         self.running
     }
-
-    fn charge_energy_cell(&self, state: &mut PlanetState, sunray: Sunray) {
-        // state.cell_mut(0).charge(sunray);   //has only one cell
-
-        if let Some((energy_cell, _)) = state.empty_cell() {
-            // <-- _ because e_cell is always at 0
-            energy_cell.charge(sunray);
-        }
-        // ^^^ if it returns none the sunray is wasted
+    fn has_charged_cells(&self,state:&PlanetState)->bool{
+        //Enterprise (planet of type C) support only 1 energy cell
+        state.cell(0).is_charged()
     }
-
-    fn try_build_rocket(&self, state: &mut PlanetState) -> Result<(), String> {
-        // if !state.has_rocket(){
-        //     if state.cell(0).is_charged(){
-        //         let cell=state.cell_mut(0);
-        //         match state.build_rocket(cell){
-        //             Ok(_)=>Ok(()),
-        //             Err(str)=>Err(str)
-        //         }
-        //     }else{
-        //         Err(String::from("Energy cell already depleted"))
-        //     }
-        // }else{
-        //     Ok(())
-        // }
-
-        if !state.has_rocket() {
-            if let Some((_, ix)) = state.full_cell() {
-                state.build_rocket(ix)?;
-            }
-        }
-        Ok(())
-    }
-
-    // fn has_charged_cells(&self,state:&PlanetState)->bool{
-    //     state.cell(0).is_charged()
-    // }
 
     pub fn deplete_charged_cell<'a>(&self, state: &'a mut PlanetState) -> Result<(), String> {
         // match state.cell_mut(0).discharge(){
@@ -341,7 +313,7 @@ pub fn create_planet(
     rx_explorer: Receiver<ExplorerToPlanet>,
     tx_explorer: Sender<PlanetToExplorer>,
 ) -> Planet {
-    let id = 67; // huhhhhhhhhhhhhhh....do we have to agree upon id values?
+    let id = 67; // huhhhhhhhhhhhhhh....do we have to agree upon id values? -> We need to ask this, we cannot have planets with the same id
     let ai = Box::new(EnterpriseAi::new());
     let gen_rules = vec![BasicResourceType::Carbon];
     let comb_rules = vec![
@@ -367,6 +339,8 @@ pub fn create_planet(
     }
 }
 
+
+//Implement more test to show during the fair
 #[cfg(test)]
 mod tests {
     use common_game::{components::planet, protocols::messages};
