@@ -1,310 +1,412 @@
-<<<<<<< HEAD
-// use common_game::components::planet;
-// use common_game::components::{planet::Planet, sunray::Sunray};
-
 #[allow(unused_imports)]
 use common_game::{
     components::{
-        planet::{Planet,PlanetState,PlanetAI,PlanetType},
         energy_cell::EnergyCell,
+        planet::{Planet, PlanetAI, PlanetState, PlanetType},
+        resource::*,
         rocket::Rocket,
         sunray::Sunray,
-        resource::*,
     },
-    protocols::{
-        messages::{
-            ExplorerToPlanet,
-            PlanetToExplorer,
-            OrchestratorToPlanet,
-            PlanetToOrchestrator
-        },
-    }
+    protocols::messages::{
+        ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
+    },
 };
 
-use std::{collections::HashSet, sync::mpsc, time::SystemTime};
+use std::collections::HashSet;
+use std::sync::mpsc::{Receiver, Sender, channel};
+use std::time::SystemTime;
 
-
-pub struct EnterpriseAi{
+pub struct EnterpriseAi {
     // for starting and stopping the planet ai
-    is_running:bool
+    running: bool, // how about parameters like prioritizing rockets construction(always or only when needed), ecc ....
 }
 
-impl PlanetAI for EnterpriseAi{
+impl PlanetAI for EnterpriseAi {
     fn start(&mut self, state: &PlanetState) {
-        self.is_running=true;
+        self.running = true;
+        // can add some initialization logic here (we have planet state after all)
     }
 
-    fn stop(&mut self,state: &PlanetState) {
-        self.is_running=false;
+    fn stop(&mut self, state: &PlanetState) {
+        self.running = false;
     }
 
     fn handle_orchestrator_msg(
-            &mut self,
-            state: &mut PlanetState,
-            generator: &Generator,
-            combinator: &Combinator,
-            msg: OrchestratorToPlanet,
-        ) -> Option<PlanetToOrchestrator> {
-
-
-        //return if self.is_running {
-            match msg{
-                OrchestratorToPlanet::Asteroid(_)=>{
-                    if self.is_running{
-                        self.try_build_rocket(state);        // maybe handle the result?
-                        Some(PlanetToOrchestrator::AsteroidAck { planet_id: state.id(), rocket:state.take_rocket()})
-                    }else{
-                        None
-                    }
-                },
-                OrchestratorToPlanet::StartPlanetAI(_)=>{
+        &mut self,
+        state: &mut PlanetState,
+        generator: &Generator,
+        combinator: &Combinator,
+        msg: OrchestratorToPlanet,
+    ) -> Option<PlanetToOrchestrator> {
+        if !self.is_running() {
+            return match msg {
+                OrchestratorToPlanet::StartPlanetAI => {
                     self.start(state);
-                    Some(PlanetToOrchestrator::StartPlanetAIResult { planet_id: state.id(), timestamp: SystemTime::now() })
-                },
-                OrchestratorToPlanet::StopPlanetAI(_)=>{
-                    if self.is_running{
-                        self.stop();
-                        Some(PlanetToOrchestrator::StopPlanetAIResult { planet_id: state.id(), timestamp: SystemTime::now() })
-                    }else{
-                        None
-                    }   
+                    Some(PlanetToOrchestrator::StartPlanetAIResult {
+                        planet_id: state.id(),
+                    })
                 }
-                OrchestratorToPlanet::Sunray(sunray)=>{
-                    if self.is_running{
-                        self.charge_energy_cell(state,sunray);
-                        self.try_build_rocket(state);       // handle returned value
-                        Some(PlanetToOrchestrator::SunrayAck { planet_id: state.id(), timestamp: SystemTime::now() })
-                    } else {
-                        None
-                    }
-                },
-                OrchestratorToPlanet::InternalStateRequest(_)=>{
-                    // let out=PlanetState::clone(state);
-                    Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: PlanetState::clone(state), timestamp: SystemTime::now() })   //no clone trait for planetstate?????
-                    // None
-                },
+                _ => None,
+            };
+        }
+
+        return match msg {
+            OrchestratorToPlanet::StartPlanetAI => {
+                self.start(state);
+                Some(PlanetToOrchestrator::StartPlanetAIResult {
+                    planet_id: state.id(),
+                })
             }
+            OrchestratorToPlanet::Asteroid(asteroid) => {
+                // if self.running{
+                //     self.try_build_rocket(state);        // maybe handle the result?
+                //     Some(PlanetToOrchestrator::AsteroidAck { planet_id: state.id(), rocket:state.take_rocket()})
+                // }else{
+                //     None
+                // }
+                //None        // <----- am i missing something or there is the handle_asteroid for this
+                Some(PlanetToOrchestrator::AsteroidAck {
+                    planet_id: state.id(),
+                    rocket: self.handle_asteroid(state, generator, combinator),
+                }) // to review
+            }
+            OrchestratorToPlanet::StopPlanetAI => {
+                self.stop(state);
+                Some(PlanetToOrchestrator::StopPlanetAIResult {
+                    planet_id: state.id(),
+                })
+            }
+            OrchestratorToPlanet::Sunray(sunray) => {
+                self.charge_energy_cell(state, sunray);
+                let _ = self.try_build_rocket(state); // handle result value
+                Some(PlanetToOrchestrator::SunrayAck {
+                    planet_id: state.id(),
+                })
+            }
+            OrchestratorToPlanet::InternalStateRequest => {
+                // let out=PlanetState::clone(state);
+                // Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: PlanetState::clone(state), timestamp: SystemTime::now() })   //no clone trait for planetstate?????
+                None
+            }
+            OrchestratorToPlanet::IncomingExplorerRequest {
+                explorer_id,
+                new_mpsc_sender,
+            } => {
+                Some(PlanetToOrchestrator::IncomingExplorerResponse {
+                    planet_id: state.id(),
+                    res: Ok(()),
+                }) // ????
+            }
+            OrchestratorToPlanet::OutgoingExplorerRequest { explorer_id } => {
+                Some(PlanetToOrchestrator::OutgoingExplorerResponse {
+                    planet_id: state.id(),
+                    res: Ok(()),
+                })
+            }
+        };
         //}else{
-            //None
+        //None
         //}
-        
     }
 
-
-
-    fn handle_asteroid(&mut self, 
-        state: &mut PlanetState, 
+    fn handle_asteroid(
+        &mut self,
+        state: &mut PlanetState,
         generator: &Generator,
-        combinator: &Combinator
+        combinator: &Combinator,
     ) -> Option<Rocket> {
-        
-        match state.take_rocket(){
-            Some(rocket)=>Some(rocket),
-            None=>{
-                self.try_build_rocket(state);
-                state.take_rocket()
+        // match state.take_rocket(){
+        // Some(rocket)=>Some(rocket),
+        // None=>{
+        //     self.try_build_rocket(state);
+        //     state.take_rocket()
+        // }
+        // }
+
+        if !self.is_running() {
+            return None;
+        }
+
+        if let Some(rocket) = state.take_rocket() {
+            return Some(rocket);
+        }
+
+        // if !state.can_have_rocket(){
+        //     return None;
+        // }
+
+        // self.try_build_rocket
+        if let Some((energy_cell, ix)) = state.full_cell() {
+            match state.build_rocket(ix) {
+                // try building an emergency rocket
+                Ok(_) => state.take_rocket(),
+                Err(err) => {
+                    eprintln!("Failed to build anemergency rocket: {err}");
+                    None
+                }
             }
+        } else {
+            None
         }
     }
 
     fn handle_explorer_msg(
-            &mut self,
-            state: &mut PlanetState,
-            generator: &Generator,
-            combinator: &Combinator,
-            msg: ExplorerToPlanet,
-        ) -> Option<PlanetToExplorer> {
-        
-        if self.is_running{
-            match msg{
-                ExplorerToPlanet::AvailableEnergyCellRequest {..}=>{
-                    Some(PlanetToExplorer::AvailableEnergyCellResponse { available_cells: 1 })
-                },
-                ExplorerToPlanet::CombineResourceRequest { explorer_id, msg }=>{
-                    // Some(PlanetToExplorer::CombineResourceResponse { complex_response: None })
-                    // can reuse code below for reference
-                    
-                    if !self.has_charged_cells(state){
-                        return Some(PlanetToExplorer::CombineResourceResponse { complex_response: None })
-                    }
-
-                    // no need to check if requested resource is available for the planet's combinator
-
-                    match msg{
-                        ComplexResourceRequest::AIPartner(r1,r2)=>{
-                            if let Ok(new_aipartner)=combinator.make_aipartner(r1, r2,state.cell_mut(0)){
-                                return Some(PlanetToExplorer::CombineResourceResponse { complex_response: Some(ComplexResource::AIPartner(new_aipartner)) })
-                            }else{
-                                return Some(PlanetToExplorer::CombineResourceResponse { complex_response: None })
-                            }
-                        },
-                        ComplexResourceRequest::Water(r1,r2)=>{
-                            if let Ok(new_water)=combinator.make_water(r1, r2,state.cell_mut(0)){
-                                return Some(PlanetToExplorer::CombineResourceResponse { complex_response: Some(ComplexResource::Water(new_water)) })
-                            }else{
-                                return Some(PlanetToExplorer::CombineResourceResponse { complex_response: None })
-                            }
-                        },
-                        ComplexResourceRequest::Diamond(r1,r2)=>{
-                            if let Ok(new_diamond)=combinator.make_diamond(r1, r2,state.cell_mut(0)){
-                                return Some(PlanetToExplorer::CombineResourceResponse { complex_response: Some(ComplexResource::Diamond(new_diamond)) })
-                            }else{
-                                return Some(PlanetToExplorer::CombineResourceResponse { complex_response: None })
-                            }
-                        }
-                    }
-                    
-                },
-                ExplorerToPlanet::GenerateResourceRequest { explorer_id, resource }=>{
-
-                    if generator.contains(resource) && self.has_charged_cells(state){
-                        //if self.use_charged_cell(state){    // problem: cell is discharged before use
-                            // if let Some(cell)=
-                            match resource{     // i messed up...it works but...need to remove resource match patterns(except of course carbon)
-                                BasicResourceType::Oxygen=>{
-                                    if let Ok(new_oxygen)=generator.make_oxygen(state.cell_mut(0)){
-                                        Some(PlanetToExplorer::GenerateResourceResponse { resource: Some(BasicResource::Oxygen(new_oxygen)) })
-                                    }else{
-                                        Some(PlanetToExplorer::GenerateResourceResponse { resource:None })
-                                    }
-                                },
-                                BasicResourceType::Hydrogen=>{
-                                    if let Ok(new_hydrogen)=generator.make_hydrogen(state.cell_mut(0)){
-                                        Some(PlanetToExplorer::GenerateResourceResponse { resource: Some(BasicResource::Hydrogen(new_hydrogen)) })
-                                    }else{
-                                        Some(PlanetToExplorer::GenerateResourceResponse { resource:None })
-                                    }
-                                },
-                                BasicResourceType::Carbon=>{
-                                    if let Ok(new_carbon)=generator.make_carbon(state.cell_mut(0)){
-                                        Some(PlanetToExplorer::GenerateResourceResponse { resource: Some(BasicResource::Carbon(new_carbon)) })
-                                    }else{
-                                        Some(PlanetToExplorer::GenerateResourceResponse { resource:None })
-                                    }
-                                },
-                                BasicResourceType::Silicon=>{
-                                    if let Ok(new_silicon)=generator.make_silicon(state.cell_mut(0)){
-                                        Some(PlanetToExplorer::GenerateResourceResponse { resource: Some(BasicResource::Silicon(new_silicon)) })
-                                    }else{
-                                        Some(PlanetToExplorer::GenerateResourceResponse { resource:None })
-                                    }
-                                },
-                            }
-                        //}else{
-                            //Some(PlanetToExplorer::GenerateResourceResponse { resource:None })
-                        //}
-                    }else{
-                        Some(PlanetToExplorer::GenerateResourceResponse { resource:None })
-                    }
-
-                },
-                ExplorerToPlanet::InternalStateRequest { explorer_id }=>{
-                    Some(PlanetToExplorer::InternalStateResponse { planet_state: PlanetState::from(state) })
-                },
-                ExplorerToPlanet::SupportedCombinationRequest {..}=>{
-                    // C type planets support unbounded combination rules (up to 6)
-                    let rules= combinator.all_available_recipes();
-                    Some(PlanetToExplorer::CombineResourceResponse { 
-                        complex_response: if rules.is_empty() {None} else {Some(rules)}        // <---- read documentation
-                    })
-                },
-                ExplorerToPlanet::SupportedResourceRequest {..}=>{
-                    // let rules=HashSet::from(BasicResourceType::Carbon);
-                    // C type planets support only one generation rule
-                    let mut rules=HashSet::new();
-                    if let Some(&rule) = generator.all_available_recipes().iter().next(){
-                        rules.insert(rule);
-                    }
-                    Some(PlanetToExplorer::SupportedResourceResponse { 
-                        resource_list: if rules.is_empty() {None} else {Some(rules)}
-                    })
-                },
-            }
-        } else{
-            None
+        &mut self,
+        state: &mut PlanetState,
+        generator: &Generator,
+        combinator: &Combinator,
+        msg: ExplorerToPlanet,
+    ) -> Option<PlanetToExplorer> {
+        if !self.is_running() {
+            return None;
         }
-    }
-}
 
-impl EnterpriseAi{
-    pub fn new()->Self{
-        // should be started by the orchestrator
-        Self { is_running: false }
-    }
-
-    fn charge_energy_cell(&self,state:&mut PlanetState,sunray:Sunray){
-        state.cell_mut(0).charge(sunray);   //has only one cell
-    }
-
-    fn try_build_rocket(&self,state:&mut PlanetState)->Result<(),String>{
-        if !state.has_rocket(){
-            if state.cell(0).is_charged(){
-                let cell=state.cell_mut(0);
-                match state.build_rocket(cell){
-                    Ok(_)=>Ok(()),
-                    Err(str)=>Err(str)
+        //if self.running{
+        match msg {
+            ExplorerToPlanet::AvailableEnergyCellRequest { .. } => {
+                let available = state
+                    .cells_iter()
+                    .filter(|energy_cell| energy_cell.is_charged())
+                    .count() as u32; // i know we need only to check if the first is charged
+                Some(PlanetToExplorer::AvailableEnergyCellResponse {
+                    available_cells: available,
+                })
+            }
+            ExplorerToPlanet::CombineResourceRequest { explorer_id, msg } => {
+                Some(PlanetToExplorer::CombineResourceResponse {
+                    complex_response: self.handle_combine_request(msg, combinator, state),
+                })
+            }
+            ExplorerToPlanet::GenerateResourceRequest {
+                explorer_id,
+                resource,
+            } => {
+                if !generator.contains(resource) {
+                    return Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
+                } else {
+                    if let Some((energy_cell, _)) = state.full_cell() {
+                        let new_resource = match resource {
+                            BasicResourceType::Carbon => generator
+                                .make_carbon(energy_cell)
+                                .map(|new_carbon| BasicResource::Carbon(new_carbon)),
+                            _ => Err("Resource not supported".to_string()), // need this for compiler to shut up
+                        };
+                        // if let Err(err)=new_resource{
+                        //     eprintln!("Could not generate resource: {err}");
+                        // }
+                        return Some(PlanetToExplorer::GenerateResourceResponse {
+                            resource: new_resource.ok(),
+                        });
+                    } else {
+                        return Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
+                    }
                 }
-            }else{
-                Err(String::from("Energy cell already depleted"))
             }
-        }else{
-            Ok(())
+            // ExplorerToPlanet::InternalStateRequest { explorer_id }=>{
+            //     Some(PlanetToExplorer::InternalStateResponse { planet_state: PlanetState::from(state) })
+            // },
+            ExplorerToPlanet::SupportedCombinationRequest { .. } => {
+                // C type planets support unbounded combination rules (up to 6)
+                // let rules= combinator.all_available_recipes();
+                // Some(PlanetToExplorer::CombineResourceResponse {
+                //     complex_response: if rules.is_empty() {None} else {Some(rules)}        // <---- read documentation
+                // })
+                Some(PlanetToExplorer::SupportedCombinationResponse {
+                    combination_list: combinator.all_available_recipes(),
+                })
+            }
+            ExplorerToPlanet::SupportedResourceRequest { .. } => {
+                // C type planets support only one generation rule
+                // let mut rules=HashSet::new();
+                // if let Some(&rule) = generator.all_available_recipes().iter().next(){
+                //     rules.insert(rule);
+                // }
+                // Some(PlanetToExplorer::SupportedResourceResponse {
+                //     resource_list: if rules.is_empty() {None} else {Some(rules)}
+                // })
+                Some(PlanetToExplorer::SupportedResourceResponse {
+                    resource_list: generator.all_available_recipes(),
+                })
+            }
         }
-    }
-
-    fn has_charged_cells(&self,state:&PlanetState)->bool{
-        state.cell(0).is_charged()
-    }
-
-    fn use_charged_cell(&self,state:&mut PlanetState)->bool{
-        match state.cell_mut(0).discharge(){
-            Ok(_)=>true,
-            Err(_)=>false   // maybe handle error
-        }
+        // } else{
+        //     None
+        // }
     }
 }
 
+impl EnterpriseAi {
+    pub fn new() -> Self {
+        Self { running: false }
+    }
 
-use std::sync::mpsc::{Receiver,Sender};
+    pub fn is_running(&self) -> bool {
+        self.running
+    }
+
+    fn charge_energy_cell(&self, state: &mut PlanetState, sunray: Sunray) {
+        // state.cell_mut(0).charge(sunray);   //has only one cell
+
+        if let Some((energy_cell, _)) = state.empty_cell() {
+            // <-- _ because e_cell is always at 0
+            energy_cell.charge(sunray);
+        }
+        // ^^^ if it returns none the sunray is wasted
+    }
+
+    fn try_build_rocket(&self, state: &mut PlanetState) -> Result<(), String> {
+        // if !state.has_rocket(){
+        //     if state.cell(0).is_charged(){
+        //         let cell=state.cell_mut(0);
+        //         match state.build_rocket(cell){
+        //             Ok(_)=>Ok(()),
+        //             Err(str)=>Err(str)
+        //         }
+        //     }else{
+        //         Err(String::from("Energy cell already depleted"))
+        //     }
+        // }else{
+        //     Ok(())
+        // }
+
+        if !state.has_rocket() {
+            if let Some((_, ix)) = state.full_cell() {
+                state.build_rocket(ix)?;
+            }
+        }
+        Ok(())
+    }
+
+    // fn has_charged_cells(&self,state:&PlanetState)->bool{
+    //     state.cell(0).is_charged()
+    // }
+
+    pub fn deplete_charged_cell<'a>(&self, state: &'a mut PlanetState) -> Result<(), String> {
+        // match state.cell_mut(0).discharge(){
+        //     Ok(_)=>true,
+        //     Err(_)=>false   // maybe handle error
+        // }
+
+        if let Some((energy_cell, _)) = state.full_cell() {
+            energy_cell.discharge();
+            Ok(())
+        } else {
+            Err("No charged energy cells available".to_string())
+        }
+    }
+
+    fn handle_combine_request(
+        &mut self,
+        request: ComplexResourceRequest,
+        combinator: &Combinator,
+        state: &mut PlanetState,
+    ) -> Option<ComplexResource> {
+        let energy_cell = match state.full_cell() {
+            Some((c, _)) => c,
+            None => return None,
+        };
+
+        match request {
+            ComplexResourceRequest::AIPartner(r1, r2) => combinator
+                .make_aipartner(r1, r2, energy_cell)
+                .ok()
+                .map(|new_aipartner| ComplexResource::AIPartner(new_aipartner)),
+            ComplexResourceRequest::Diamond(r1, r2) => combinator
+                .make_diamond(r1, r2, energy_cell)
+                .ok()
+                .map(|new_diamond| ComplexResource::Diamond(new_diamond)),
+            ComplexResourceRequest::Dolphin(r1, r2) => combinator
+                .make_dolphin(r1, r2, energy_cell)
+                .ok()
+                .map(|new_dolphin| ComplexResource::Dolphin(new_dolphin)),
+            ComplexResourceRequest::Life(r1, r2) => combinator
+                .make_life(r1, r2, energy_cell)
+                .ok()
+                .map(|new_life| ComplexResource::Life(new_life)),
+            ComplexResourceRequest::Robot(r1, r2) => combinator
+                .make_robot(r1, r2, energy_cell)
+                .ok()
+                .map(|new_robot| ComplexResource::Robot(new_robot)),
+            ComplexResourceRequest::Water(r1, r2) => combinator
+                .make_water(r1, r2, energy_cell)
+                .ok()
+                .map(|new_water| ComplexResource::Water(new_water)),
+        }
+    }
+}
 
 pub fn create_planet(
     rx_orchestrator: Receiver<OrchestratorToPlanet>,
     tx_orchestrator: Sender<PlanetToOrchestrator>,
     rx_explorer: Receiver<ExplorerToPlanet>,
-    tx_explorer: Sender<PlanetToExplorer>
-)->Planet<EnterpriseAi>{
-    let id=67; // huhhhhhhhhhhhhhh....do we have to agree upon id values?
-    let ai=EnterpriseAi::new();
-    let gen_rules=vec![BasicResourceType::Carbon];
-    let comb_rules=vec![
+    tx_explorer: Sender<PlanetToExplorer>,
+) -> Planet {
+    let id = 67; // huhhhhhhhhhhhhhh....do we have to agree upon id values?
+    let ai = Box::new(EnterpriseAi::new());
+    let gen_rules = vec![BasicResourceType::Carbon];
+    let comb_rules = vec![
         ComplexResourceType::Water,
         ComplexResourceType::Diamond,
         ComplexResourceType::Life,
         ComplexResourceType::Robot,
         ComplexResourceType::Dolphin,
-        ComplexResourceType::AIPartner
+        ComplexResourceType::AIPartner,
     ];
 
     match Planet::new(
         id,
         PlanetType::C,
         ai,
-        gen_rules,  // basic resources
-        comb_rules, // combinator
-        (rx_orchestrator,tx_orchestrator),
-        (rx_explorer,tx_explorer)
-    ){
-        Ok(planet)=>planet,
-        Err(error)=>panic!("{error}")
+        gen_rules,
+        comb_rules,
+        (rx_orchestrator, tx_orchestrator),
+        (rx_explorer, tx_explorer),
+    ) {
+        Ok(planet) => planet,
+        Err(error) => panic!("{error}"), // need to handle properly error case
     }
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
+    use common_game::{components::planet, protocols::messages};
+
     use super::*;
 
     #[test]
-    fn test_creation(){
-        assert_eq!(1,1)
+    fn is_one_equal_to_one() {
+        assert_eq!(1, 1)
+    }
+
+    #[test]
+    fn should_not_be_runnning_when_new() {
+        assert!(!EnterpriseAi::new().is_running());
+    }
+
+    fn create_dummy_state() -> PlanetState {
+        unimplemented!()
+    }
+
+    #[test]
+    fn ai_should_start_n_stop() {
+        let mut ai = EnterpriseAi::new();
+        let dummy_state = create_dummy_state();
+
+        ai.start(&dummy_state);
+        assert!(ai.is_running());
+
+        ai.stop(&dummy_state);
+        assert!(!ai.is_running());
+    }
+
+    #[test]
+    fn test_planet_creation() {
+        // let (tx_orchestrator,rx_orchestrator)=channel();
+        // let (tx_explorer,rx_explorer)=channel();
+
+        // let planet=create_planet(rx_orchestrator, tx_orchestrator, rx_explorer, tx_explorer);
+
+        // assert_eq!(planet.id(),67);
+        // assert_eq!(planet.planet_type(),PlanetType::C);
     }
 }

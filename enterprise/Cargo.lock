@@ -5,8 +5,9 @@ version = 4
 [[package]]
 name = "common-game"
 version = "0.1.0"
-source = "git+https://github.com/unitn-ap-2025/common.git#abc2103b87f21fc61fe200ab9337cad2a1b27726"
+source = "git+https://github.com/unitn-ap-2025/common.git#ffa9b9a860c4064d8cd7da93577a1386c2693588"
 dependencies = [
+ "lazy_static",
  "paste",
 ]
 
@@ -16,6 +17,12 @@ version = "0.1.0"
 dependencies = [
  "common-game",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "paste"
