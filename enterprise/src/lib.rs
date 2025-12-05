@@ -60,7 +60,7 @@ impl PlanetAI for EnterpriseAi {
             };
         }
 
-        return match msg {
+        match msg {
             OrchestratorToPlanet::StartPlanetAI => {
                 self.start(state);
                 Some(PlanetToOrchestrator::StartPlanetAIResult {
@@ -70,8 +70,11 @@ impl PlanetAI for EnterpriseAi {
             OrchestratorToPlanet::Asteroid(asteroid) => {
                 Some(PlanetToOrchestrator::AsteroidAck {
                     planet_id: state.id(),
-                    rocket: self.handle_asteroid(state, generator, combinator),
-                }) // to review -> I think it is okay, all the logic is done in handle_asteroid
+                    destroyed: match self.handle_asteroid(state, generator, combinator){
+                        None => true,
+                        Some(rocket)=> true,
+                    },
+                })
             }
             OrchestratorToPlanet::StopPlanetAI => {
                 self.stop(state);
@@ -97,18 +100,11 @@ impl PlanetAI for EnterpriseAi {
                 })
             }
             OrchestratorToPlanet::InternalStateRequest => {
-                //Problem: No copy/clone trait for PlanetState
-                //There is already an issue about it on GitHub
-
-                //let out=PlanetState::clone(state);
-                //Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: PlanetState::clone(state)})
-                None
+                // Create a dummy struct containing an overview of the internal state of a planet.
+                let out=PlanetState::to_dummy(state);
+                Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: out})
             }
-            OrchestratorToPlanet::IncomingExplorerRequest {
-                explorer_id,
-                new_mpsc_sender,
-            } => {
-
+            OrchestratorToPlanet::IncomingExplorerRequest { explorer_id, new_mpsc_sender, } => {
                 //Explorer coming to the planet, increase counter
                 self.num_explorers += 1;
 
@@ -127,7 +123,7 @@ impl PlanetAI for EnterpriseAi {
                     res: Ok(()), // This is a Result<(), String>, I didn't understand in which cases an explorer wouldn't be allowed to go out
                 })
             }
-        };
+        }
     }
 
     fn handle_asteroid(
@@ -143,10 +139,10 @@ impl PlanetAI for EnterpriseAi {
         //If this does not work, it returns None
 
         match state.take_rocket() {
-            Some(rocket) => { return Some(rocket) },
+            Some(rocket) => { Some(rocket) },
             None => {
                 if self.has_charged_cells(state){state.build_rocket(0);}
-                return state.take_rocket();
+                state.take_rocket()
             }
         }
     }
@@ -284,38 +280,126 @@ impl EnterpriseAi {
         request: ComplexResourceRequest,
         combinator: &Combinator,
         state: &mut PlanetState,
-    ) -> Option<ComplexResource> {
-        let energy_cell = match state.full_cell() {
-            Some((c, _)) => c,
-            None => return None,
-        };
+    ) -> Result<ComplexResource, (String, GenericResource, GenericResource)> {
 
-        //We are not considering the possibility that the explorer passed the wrong resources in the request
+        // I didn't manage to find a way to do the energy cell check outside because of r1 and r2
+        // Maybe a function would be better?
+
+        // let energy_cell = match state.full_cell() {
+        //     Some((c, _)) => c,
+        //     None => { return Err("No energy cell available".to_string(), r1, r2)},
+        // };
+
+        // This became quite big... Maybe there is a better way to do it
+
         match request {
-            ComplexResourceRequest::AIPartner(r1, r2) => combinator
-                .make_aipartner(r1, r2, energy_cell)
-                .ok()
-                .map(|new_aipartner| ComplexResource::AIPartner(new_aipartner)),
-            ComplexResourceRequest::Diamond(r1, r2) => combinator
-                .make_diamond(r1, r2, energy_cell)
-                .ok()
-                .map(|new_diamond| ComplexResource::Diamond(new_diamond)),
-            ComplexResourceRequest::Dolphin(r1, r2) => combinator
-                .make_dolphin(r1, r2, energy_cell)
-                .ok()
-                .map(|new_dolphin| ComplexResource::Dolphin(new_dolphin)),
-            ComplexResourceRequest::Life(r1, r2) => combinator
-                .make_life(r1, r2, energy_cell)
-                .ok()
-                .map(|new_life| ComplexResource::Life(new_life)),
-            ComplexResourceRequest::Robot(r1, r2) => combinator
-                .make_robot(r1, r2, energy_cell)
-                .ok()
-                .map(|new_robot| ComplexResource::Robot(new_robot)),
-            ComplexResourceRequest::Water(r1, r2) => combinator
-                .make_water(r1, r2, energy_cell)
-                .ok()
-                .map(|new_water| ComplexResource::Water(new_water)),
+            ComplexResourceRequest::AIPartner(r1, r2) => {
+                let energy_cell = match state.full_cell() {
+                    Some((c, _)) => c,
+                    None => { return Err(("No energy cell available".to_string(),
+                                          GenericResource::ComplexResources(ComplexResource::Robot(r1)),
+                                          GenericResource::ComplexResources(ComplexResource::Diamond(r2)))) },
+                };
+
+                let complex = combinator.make_aipartner(r1, r2, energy_cell);
+
+                match complex {
+                    Ok(complex) => {Ok(ComplexResource::AIPartner(complex))},
+                    Err((s, r1, r2)) => {Err((s,
+                                              GenericResource::ComplexResources(ComplexResource::Robot(r1)),
+                                              GenericResource::ComplexResources(ComplexResource::Diamond(r2))))}
+                }
+
+
+            },
+            ComplexResourceRequest::Diamond(r1, r2) =>  {
+                let energy_cell = match state.full_cell() {
+                    Some((c, _)) => c,
+                    None => { return Err(("No energy cell available".to_string(),
+                                          GenericResource::BasicResources(BasicResource::Carbon(r1)),
+                                          GenericResource::BasicResources(BasicResource::Carbon(r2)))) },
+                };
+
+                let complex = combinator.make_diamond(r1, r2, energy_cell);
+
+                match complex {
+                    Ok(complex) => {Ok(ComplexResource::Diamond(complex))},
+                    Err((s, r1, r2)) => {Err((s,
+                                              GenericResource::BasicResources(BasicResource::Carbon(r1)),
+                                              GenericResource::BasicResources(BasicResource::Carbon(r2))))}
+                }
+
+
+            },
+            ComplexResourceRequest::Dolphin(r1, r2) => {
+                let energy_cell = match state.full_cell() {
+                    Some((c, _)) => c,
+                    None => { return Err(("No energy cell available".to_string(),
+                                          GenericResource::ComplexResources(ComplexResource::Water(r1)),
+                                          GenericResource::ComplexResources(ComplexResource::Life(r2)))) },
+                };
+
+                let complex = combinator.make_dolphin(r1, r2, energy_cell);
+
+                match complex {
+                    Ok(complex) => {Ok(ComplexResource::Dolphin(complex))},
+                    Err((s, r1, r2)) => {Err((s,
+                                              GenericResource::ComplexResources(ComplexResource::Water(r1)),
+                                              GenericResource::ComplexResources(ComplexResource::Life(r2))))}
+                }
+            },
+            ComplexResourceRequest::Life(r1, r2) => {
+                let energy_cell = match state.full_cell() {
+                    Some((c, _)) => c,
+                    None => { return Err(("No energy cell available".to_string(),
+                                          GenericResource::ComplexResources(ComplexResource::Water(r1)),
+                                          GenericResource::BasicResources(BasicResource::Carbon(r2)))) },
+                };
+
+                let complex = combinator.make_life(r1, r2, energy_cell);
+
+                match complex {
+                    Ok(complex) => {Ok(ComplexResource::Life(complex))},
+                    Err((s, r1, r2)) => {Err((s,
+                                              GenericResource::ComplexResources(ComplexResource::Water(r1)),
+                                              GenericResource::BasicResources(BasicResource::Carbon(r2))))}
+                }
+            },
+            ComplexResourceRequest::Robot(r1, r2) => {
+                let energy_cell = match state.full_cell() {
+                    Some((c, _)) => c,
+                    None => { return Err(("No energy cell available".to_string(),
+                                          GenericResource::BasicResources(BasicResource::Silicon(r1)),
+                                          GenericResource::ComplexResources(ComplexResource::Life(r2)))) },
+                };
+
+                let complex = combinator.make_robot(r1, r2, energy_cell);
+
+                match complex {
+                    Ok(complex) => {Ok(ComplexResource::Robot(complex))},
+                    Err((s, r1, r2)) => {Err((s,
+                                              GenericResource::BasicResources(BasicResource::Silicon(r1)),
+                                              GenericResource::ComplexResources(ComplexResource::Life(r2))))}
+                }
+            },
+            ComplexResourceRequest::Water(r1, r2) => {
+                let energy_cell = match state.full_cell() {
+                    Some((c, _)) => c,
+                    None => { return Err(("No energy cell available".to_string(),
+                                          GenericResource::BasicResources(BasicResource::Hydrogen(r1)),
+                                          GenericResource::BasicResources(BasicResource::Oxygen(r2)))) },
+                };
+
+                let complex = combinator.make_water(r1, r2, energy_cell);
+
+                match complex {
+                    Ok(complex) => {Ok(ComplexResource::Water(complex))},
+                    Err((s, r1, r2)) => {Err((s,
+                                              GenericResource::BasicResources(BasicResource::Hydrogen(r1)),
+                                              GenericResource::BasicResources(BasicResource::Oxygen(r2))))}
+                }
+            },
+
         }
     }
 }
@@ -345,7 +429,7 @@ pub fn create_planet(
         gen_rules,
         comb_rules,
         (rx_orchestrator, tx_orchestrator),
-        (rx_explorer, tx_explorer),
+        rx_explorer,
     ) {
         Ok(planet) => planet,
         Err(error) => panic!("{error}"), // need to handle properly error case
@@ -366,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn should_not_be_runnning_when_new() {
+    fn should_not_be_running_when_new() {
         assert!(!EnterpriseAi::new().is_running());
     }
 
