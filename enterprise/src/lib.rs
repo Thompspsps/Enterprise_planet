@@ -179,10 +179,6 @@ impl PlanetAI for EnterpriseAi {
                     resource: self.handle_resource_request(resource, generator, state)
                 })
             }
-            // Was this message removed in the recent versions? I can still see it in the common code
-            // ExplorerToPlanet::InternalStateRequest { explorer_id }=>{
-            //     Some(PlanetToExplorer::InternalStateResponse { planet_state: PlanetState::from(state) })
-            // },
             ExplorerToPlanet::SupportedCombinationRequest { .. } => {
                 // C type planets support unbounded combination rules (up to 6)
                 Some(PlanetToExplorer::SupportedCombinationResponse {
@@ -436,7 +432,7 @@ pub fn create_planet(
     }
 }
 
-
+//Should we create another file for the tests?
 //Implement more tests to show during the faire
 #[cfg(test)]
 mod tests {
