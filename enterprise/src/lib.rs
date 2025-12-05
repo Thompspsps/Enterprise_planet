@@ -83,9 +83,10 @@ impl PlanetAI for EnterpriseAi {
                 state.charge_cell(sunray);
 
                 // If there are no explorers, the planet will prioritize self-defense
+                // It will only try to build a rocket if it doesn't have any rocket
                 //Otherwise, it will store the energy cell for the explorers
                 if self.num_explorers == 0 {
-                    if self.has_charged_cells(state){ //build_rocket does all the checks except if the energy cell is charged (even if the comment on the code says otherwise)
+                    if self.has_charged_cells(state) && !state.has_rocket(){ //build_rocket does all the checks except if the energy cell is charged (even if the comment on the code says otherwise)
                         state.build_rocket(0);
                     }
                 }
@@ -178,34 +179,9 @@ impl PlanetAI for EnterpriseAi {
                 })
             }
             ExplorerToPlanet::GenerateResourceRequest { explorer_id, resource} => {
-                //Should we call a function like in the previous match (clearer code)
-                // Some(PlanetToExplorer::GenerateResourceResponse {
-                //     resource: self.handle_resource_request(msg, generator, state)
-                // })
-
-                //I also think that we could avoid that unnecessary check
-
-                if !generator.contains(resource) {
-                    return Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
-                }
-                else {
-                    if let Some((energy_cell, _)) = state.full_cell() {
-                        let new_resource = match resource {
-                            BasicResourceType::Carbon => generator
-                                .make_carbon(energy_cell)
-                                .map(|new_carbon| BasicResource::Carbon(new_carbon)),
-                            _ => Err("Resource not supported".to_string()), // need this for compiler to shut up
-                        };
-                        // if let Err(err)=new_resource{
-                        //     eprintln!("Could not generate resource: {err}");
-                        // }
-                        return Some(PlanetToExplorer::GenerateResourceResponse {
-                            resource: new_resource.ok(),
-                        });
-                    } else {
-                        return Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
-                    }
-                }
+                Some(PlanetToExplorer::GenerateResourceResponse {
+                    resource: self.handle_resource_request(resource, generator, state)
+                })
             }
             // Was this message removed in the recent versions? I can still see it in the common code
             // ExplorerToPlanet::InternalStateRequest { explorer_id }=>{
@@ -213,23 +189,12 @@ impl PlanetAI for EnterpriseAi {
             // },
             ExplorerToPlanet::SupportedCombinationRequest { .. } => {
                 // C type planets support unbounded combination rules (up to 6)
-                // let rules= combinator.all_available_recipes();
-                // Some(PlanetToExplorer::CombineResourceResponse {
-                //     complex_response: if rules.is_empty() {None} else {Some(rules)}        // <---- read documentation
-                // })
                 Some(PlanetToExplorer::SupportedCombinationResponse {
                     combination_list: combinator.all_available_recipes(),
                 })
             }
             ExplorerToPlanet::SupportedResourceRequest { .. } => {
                 // C type planets support only one generation rule
-                // let mut rules=HashSet::new();
-                // if let Some(&rule) = generator.all_available_recipes().iter().next(){
-                //     rules.insert(rule);
-                // }
-                // Some(PlanetToExplorer::SupportedResourceResponse {
-                //     resource_list: if rules.is_empty() {None} else {Some(rules)}
-                // })
                 Some(PlanetToExplorer::SupportedResourceResponse {
                     resource_list: generator.all_available_recipes(),
                 })
@@ -252,19 +217,66 @@ impl EnterpriseAi {
         //Enterprise (planet of type C) support only 1 energy cell
         state.cell(0).is_charged()
     }
+// Do we need this function?
+    // pub fn deplete_charged_cell(&self, state: &mut PlanetState) -> Result<(), String> {
+    //     // match state.cell_mut(0).discharge(){
+    //     //     Ok(_)=>true,
+    //     //     Err(_)=>false   // maybe handle error
+    //     // }
+    //
+    //     if let Some((energy_cell, _)) = state.full_cell() {
+    //         energy_cell.discharge();
+    //         Ok(())
+    //     } else {
+    //         Err("No charged energy cells available".to_string())
+    //     }
+    // }
 
-    pub fn deplete_charged_cell<'a>(&self, state: &'a mut PlanetState) -> Result<(), String> {
-        // match state.cell_mut(0).discharge(){
-        //     Ok(_)=>true,
-        //     Err(_)=>false   // maybe handle error
-        // }
-
-        if let Some((energy_cell, _)) = state.full_cell() {
-            energy_cell.discharge();
-            Ok(())
-        } else {
-            Err("No charged energy cells available".to_string())
+    fn handle_resource_request(
+        &mut self,
+        request: BasicResourceType,
+        generator: &Generator,
+        state: &mut PlanetState,
+    ) -> Option<BasicResource>{
+        if !generator.contains(request) {
+            return None;
         }
+        else {
+
+            let energy_cell = match state.full_cell() {
+                Some((c, _)) => c,
+                None => return None,
+            };
+
+            let new_resource = generator
+                .make_carbon(energy_cell)
+                .map(|new_carbon| BasicResource::Carbon(new_carbon));
+
+            match new_resource {
+                Ok(new_resource) => {return Some(new_resource)},
+                Err(_) => {}, //Handle error?
+            }
+
+            // Do we need to match the request?
+            // Because if generator contains request, we know it is carbon.
+            // Or should we keep the version with the match for extra safety?
+
+            // if let Some((energy_cell, _)) = state.full_cell() {
+            //     let new_resource = match request {
+            //         BasicResourceType::Carbon => generator
+            //             .make_carbon(energy_cell)
+            //             .map(|new_carbon| BasicResource::Carbon(new_carbon)),
+            //         _ => Err("Resource not supported".to_string()), // need this for compiler to shut up
+            //     };
+            //
+            //
+            //     match new_resource {
+            //         Ok(new_resource) => {return Some(new_resource)},
+            //         Err(_) => {}, //Handle error?
+            //     }
+            // }
+        }
+        None
     }
 
     fn handle_combine_request(
@@ -278,6 +290,7 @@ impl EnterpriseAi {
             None => return None,
         };
 
+        //We are not considering the possibility that the explorer passed the wrong resources in the request
         match request {
             ComplexResourceRequest::AIPartner(r1, r2) => combinator
                 .make_aipartner(r1, r2, energy_cell)
@@ -340,7 +353,7 @@ pub fn create_planet(
 }
 
 
-//Implement more test to show during the fair
+//Implement more tests to show during the faire
 #[cfg(test)]
 mod tests {
     use common_game::{components::planet, protocols::messages};
