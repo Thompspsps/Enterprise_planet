@@ -132,12 +132,12 @@ impl PlanetAI for EnterpriseAi {
         generator: &Generator,
         combinator: &Combinator,
     ) -> Option<Rocket> {
-        if !self.is_running() { return None; }
-
+        if !self.running {
+            return None;
+        }
         //This function tries to take a rocket from the planet
         //If there is no rocket, it tries to build one
         //If this does not work, it returns None
-
         match state.take_rocket() {
             Some(rocket) => { Some(rocket) },
             None => {
@@ -401,12 +401,13 @@ impl EnterpriseAi {
 }
 
 pub fn create_planet(
+    id: u8,
     rx_orchestrator: Receiver<OrchestratorToPlanet>,
     tx_orchestrator: Sender<PlanetToOrchestrator>,
     rx_explorer: Receiver<ExplorerToPlanet>,
     tx_explorer: Sender<PlanetToExplorer>,
 ) -> Planet {
-    let id = 67; // huhhhhhhhhhhhhhh....do we have to agree upon id values? -> We need to ask this, we cannot have planets with the same id
+    //let id = 67; // huhhhhhhhhhhhhhh....do we have to agree upon id values? -> We need to ask this, we cannot have planets with the same id
     let ai = Box::new(EnterpriseAi::new());
     let gen_rules = vec![BasicResourceType::Carbon];
     let comb_rules = vec![
@@ -439,6 +440,8 @@ mod tests {
     use common_game::{components::planet, protocols::messages};
 
     use super::*;
+    use std::sync::mpsc::{Receiver, Sender, channel};
+    use std::time::SystemTime;
 
     #[test]
     fn is_one_equal_to_one() {
@@ -446,8 +449,9 @@ mod tests {
     }
 
     #[test]
-    fn should_not_be_running_when_new() {
-        assert!(!EnterpriseAi::new().is_running());
+    fn test_ai_initial_state_should_not_be_running() {
+        let ai = EnterpriseAi::new();
+        assert!(!ai.is_running());
     }
 
     fn create_dummy_state() -> PlanetState {
