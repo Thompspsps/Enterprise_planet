@@ -712,6 +712,7 @@ pub fn create_planet(
 // mod tests {
 // use common_game::{
 //     components::{
+//         asteroid::Asteroid,
 //         energy_cell::EnergyCell,
 //         planet::{Planet, PlanetAI, PlanetState, PlanetType},
 //         resource::*,
@@ -721,6 +722,7 @@ pub fn create_planet(
 //     protocols::messages::{
 //         ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
 //     },
+//};
 //     use crate::ai::EnterpriseAi;
 
 //     use super::*;
