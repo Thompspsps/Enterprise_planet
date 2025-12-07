@@ -714,17 +714,20 @@ pub fn create_planet(
 // mod tests {
 //     use common_game::{
 //         components::{
-//             energy_cell::EnergyCell,
-//             planet::PlanetState,
-//             rocket::Rocket,
-//         },
+        //     asteroid::Asteroid,    
+        //     energy_cell::EnergyCell,
+        //     planet::{PlanetState, PlanetType},  
+        //     resource::{BasicResourceType, ComplexResourceType, Generator, Combinator}, 
+        //     rocket::Rocket,
+        //     sunray::Sunray,        
+        // },
 //         protocols::messages,
 //     };
 //     use crate::ai::EnterpriseAi;
 
 //     use super::*;
 //     use std::sync::mpsc::{Receiver, Sender, channel};
-//     use std::time::SystemTime;
+//
 
 //     #[test]
 //     fn is_one_equal_to_one() {
