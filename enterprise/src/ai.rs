@@ -768,7 +768,7 @@ pub fn create_planet(
 //         assert!(!ai.is_running());
 //     }
 //     #[test]
-//     fn test_sunray_charging() {
+//     fn sunray_charging() {
 //         let mut ai = EnterpriseAi::new();
 //         let mut state = create_dummy_state();
 //         let generator = Generator::new();
@@ -788,7 +788,7 @@ pub fn create_planet(
 //         assert!(state.cell(0).is_charged());
 //     }
 //     #[test]
-//     fn test_planet_creation() {
+//     fn planet_creation() {
 //         let (tx_orchestrator,rx_orchestrator)=channel();
 //         let (tx_explorer,rx_explorer)=channel();
 
@@ -803,7 +803,7 @@ pub fn create_planet(
 //         assert!(state.can_have_rocket());
 //     }
 //     #[test]
-//     fn test_asteroid_defense_with_rocket() {
+//     fn asteroid_defensed_by_rocket() {
 //         let mut ai = EnterpriseAi::new();
 //         let mut state = create_state_with_rocket();
 //         let generator = Generator::new();
@@ -820,7 +820,7 @@ pub fn create_planet(
 //     assert!(response.is_some());
 //    }
 // #[test]
-//     fn test_sunray_message() {
+//     fn sunray_message() {
 //         let mut ai = EnterpriseAi::new();
 //         let mut state = create_dummy_state();
 //         let generator = common_game::components::resource::Generator::new();
@@ -838,7 +838,7 @@ pub fn create_planet(
 //         assert!(response.is_some());
 //}
 //     #[test]
-    // fn test_asteroid_message() {
+    // fn asteroid_message() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
     //     let generator = common_game::components::resource::Generator::new();
@@ -856,7 +856,7 @@ pub fn create_planet(
         
     //     assert!(response.is_some());
     // #[test]
-    // fn test_resource_generation_request() {
+    // fn resource_generation_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
     //     let generator = common_game::components::resource::Generator::new();
@@ -880,7 +880,7 @@ pub fn create_planet(
     // }
 
     // #[test]
-    // fn test_supported_resources_request() {
+    // fn supported_resources_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
     //     let generator = common_game::components::resource::Generator::new();
@@ -903,7 +903,7 @@ pub fn create_planet(
     // }
 
     // #[test]
-    // fn test_available_energy_cells_request() {
+    // fn available_energy_cells_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
     //     let generator = common_game::components::resource::Generator::new();
@@ -933,7 +933,7 @@ pub fn create_planet(
     // }
 
     // #[test]
-    // fn test_incoming_explorer_request() {
+    // fn incoming_explorer_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
     //     let generator = common_game::components::resource::Generator::new();
@@ -965,7 +965,7 @@ pub fn create_planet(
     // }
 
     // #[test]
-    // fn test_outgoing_explorer_request() {
+    // fn outgoing_explorer_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
     //     let generator = common_game::components::resource::Generator::new();
