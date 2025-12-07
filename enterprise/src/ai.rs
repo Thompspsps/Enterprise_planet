@@ -1090,7 +1090,7 @@ pub fn create_planet(
 //     ai.start(&state);
 //     let resource_msg = ExplorerToPlanet::GenerateResourceRequest {
 //         explorer_id: 1,
-//         resource: BasicResourceType::Oxygen,
+//         resource: BasicResourceType::Oxygen, // it is not carbon
 //     };
     
 //     let response = ai.handle_explorer_msg(
