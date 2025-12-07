@@ -957,14 +957,6 @@ pub fn create_planet(
 //     );
     
 //     assert!(response.is_some());
-    
-//     match response.unwrap() {
-//         messages::PlanetToOrchestrator::IncomingExplorerResponse { planet_id, r} => {
-//             assert_eq!(planet_id, 67);
-//         }
-//         _ => panic!("Need IncomingExplorerResponse"),
-//     }
-// }
 
 // #[test]
 // fn outgoing_explorer_request() {
@@ -987,11 +979,126 @@ pub fn create_planet(
 //     );
     
 //     assert!(response.is_some());
+// #[test]
+// fn complex_resource_combination() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_state_with_charged_cell();
+//     let generator = Generator::new();
+//     let mut combinator = Combinator::new();
     
+//     combinator.add(ComplexResourceType::Water).unwrap();
+//     combinator.add(ComplexResourceType::Diamond).unwrap();
+//     ai.start(&state);
+    
+//     let request_msg = ExplorerToPlanet::SupportedCombinationRequest {
+//         explorer_id: 1,
+//     };
+    
+//     let response = ai.handle_explorer_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         request_msg,
+//     );
+    
+//     assert!(response.is_some());
 //     match response.unwrap() {
-//         PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, x} => {
-//             assert_eq!(planet_id, 67);
+//         PlanetToExplorer::SupportedCombinationResponse { combination_list } => {
+//             assert_eq!(combination_list.len(), 2);
 //         }
-//         _ => panic!("Need OutgoingExplorerResponse"),
+//         _ => panic!("Need SupportedCombinationResponse"),
 //     }
 // }
+// #[test]
+// fn ai_stopped_() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_dummy_state();
+//     let generator = Generator::new();
+//     let combinator = Combinator::new();
+    
+//     assert!(!ai.is_running());
+    
+//     let sunray_msg = OrchestratorToPlanet::Sunray(Sunray::new());
+//     let response = ai.handle_orchestrator_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         sunray_msg,
+//     );
+    
+//     assert!(response.is_none());
+    
+//     let start_msg = OrchestratorToPlanet::StartPlanetAI;
+//     let response = ai.handle_orchestrator_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         start_msg,
+//     );
+    
+//     assert!(response.is_some());
+//     assert!(ai.is_running();
+// }
+// #[test]
+// fn kill_planet() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_dummy_state();
+//     let generator = Generator::new();
+//     let combinator = Combinator::new();
+    
+//     ai.start(&state);
+    
+//     let kill_msg = OrchestratorToPlanet::KillPlanet;
+//     let response = ai.handle_orchestrator_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         kill_msg,
+//     );
+    
+//     assert!(response.is_some());
+// }
+// #[test]
+// fn resource_generation_without_energy() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_dummy_state(); // now i believe there isn't energy cell in it
+//     let mut generator = Generator::new();
+//     let combinator = Combinator::new();  
+//     generator.add(BasicResourceType::Carbon).unwrap();
+//     ai.start(&state);
+//     let resource_msg = ExplorerToPlanet::GenerateResourceRequest {
+//         explorer_id: 1,
+//         resource: BasicResourceType::Carbon,
+//     };
+    
+//     let response = ai.handle_explorer_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         resource_msg,
+//     );
+    
+//     assert!(response.is_some());
+
+// #[test]
+// fn test_unsupported_resource_request() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_state_with_charged_cell();
+//     let generator = Generator::new(); 
+//     let combinator = Combinator::new();
+    
+//     ai.start(&state);
+//     let resource_msg = ExplorerToPlanet::GenerateResourceRequest {
+//         explorer_id: 1,
+//         resource: BasicResourceType::Oxygen,
+//     };
+    
+//     let response = ai.handle_explorer_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         resource_msg,
+//     );
+    
+//     assert!(response.is_some());
+//     match response.unwrap() {
