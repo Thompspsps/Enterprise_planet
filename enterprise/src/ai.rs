@@ -723,18 +723,17 @@ pub fn create_planet(
 //         ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
 //     },
 //};
-//     use crate::ai::EnterpriseAi;
-
-//     use super::*;
-//     use std::sync::mpsc::{Receiver, Sender, channel};
+// use crate::ai::EnterpriseAi;
+// use super::*;
+// use std::sync::mpsc::{Receiver, Sender, channel};
 //
 
-//     #[test]
+// #[test]
 //     fn is_one_equal_to_one() {
 //         assert_eq!(1, 1)
 //     }
 
-//     #[test]
+// #[test]
 //     fn test_ai_initial_state_should_not_be_running() {
 //         let ai = EnterpriseAi::new();
 //         assert!(!ai.is_running());
@@ -758,7 +757,7 @@ pub fn create_planet(
 //         let _ = state.build_rocket(0);
 //         state
 //     }
-//     #[test]
+// #[test]
 //     fn ai_should_start_n_stop() {
 //         let mut ai = EnterpriseAi::new();
 //         let dummy_state = create_dummy_state();
@@ -769,7 +768,7 @@ pub fn create_planet(
 //         ai.stop(&dummy_state);
 //         assert!(!ai.is_running());
 //     }
-//     #[test]
+// #[test]
 //     fn planet_creation() {
 //         let (tx_orchestrator,rx_orchestrator)=channel();
 //         let (tx_explorer,rx_explorer)=channel();
@@ -784,7 +783,7 @@ pub fn create_planet(
 //         assert!(!state.has_rocket());
 //         assert!(state.can_have_rocket());
 //     }
-//     #[test]
+// #[test]
 //     fn sunray_charging() {
 //         let mut ai = EnterpriseAi::new();
 //         let mut state = create_dummy_state();
@@ -805,7 +804,7 @@ pub fn create_planet(
 //         assert!(state.cell(0).is_charged());
 //     }
 
-//     #[test]
+// #[test]
 //     fn asteroid_defensed_by_rocket() {
 //         let mut ai = EnterpriseAi::new();
 //         let mut state = create_state_with_rocket();
@@ -841,158 +840,158 @@ pub fn create_planet(
 //         assert!(response.is_some());
 //}
 //     #[test]
-    // fn asteroid_message() {
-    //     let mut ai = EnterpriseAi::new();
-    //     let mut state = create_dummy_state();
-    //     let generator = Generator::new();
-    //     let combinator = Combinator::new();
-        
-    //     ai.start(&state);
+// fn asteroid_message() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_dummy_state();
+//     let generator = Generator::new();
+//     let combinator = Combinator::new();
+    
+//     ai.start(&state);
 
-    //     let asteroid_msg = OrchestratorToPlanet::Asteroid(Asteroid::new());
-    //     let response = ai.handle_orchestrator_msg(
-    //         &mut state,
-    //         &generator,
-    //         &combinator,
-    //         asteroid_msg,
-    //     );
-        
-    //     assert!(response.is_some());
-    // #[test]
-    // fn resource_generation_request() {
-    //     let mut ai = EnterpriseAi::new();
-    //     let mut state = create_dummy_state();
-    //     let generator = enerator::new();
-    //     let combinator = Combinator::new();
-        
-    //     ai.start(&state);
+//     let asteroid_msg = OrchestratorToPlanet::Asteroid(Asteroid::new());
+//     let response = ai.handle_orchestrator_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         asteroid_msg,
+//     );
+    
+//     assert!(response.is_some());
+// #[test]
+// fn resource_generation_request() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_dummy_state();
+//     let generator = enerator::new();
+//     let combinator = Combinator::new();
+    
+//     ai.start(&state);
 
-    //     let resource_msg =ExplorerToPlanet::GenerateResourceRequest {
-    //         explorer_id: 1,
-    //         resource: BasicResourceType::Carbon,
-    //     };
-        
-    //     let response = ai.handle_explorer_msg(
-    //         &mut state,
-    //         &generator,
-    //         &combinator,
-    //         resource_msg,
-    //     );
-        
-    //     assert!(response.is_some());
-    // }
+//     let resource_msg =ExplorerToPlanet::GenerateResourceRequest {
+//         explorer_id: 1,
+//         resource: BasicResourceType::Carbon,
+//     };
+    
+//     let response = ai.handle_explorer_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         resource_msg,
+//     );
+    
+//     assert!(response.is_some());
+// }
 
-    // #[test]
-    // fn supported_resources_request() {
-    //     let mut ai = EnterpriseAi::new();
-    //     let mut state = create_dummy_state();
-    //     let generator = Generator::new();
-    //     let combinator = Combinator::new();
-        
-    //     ai.start(&state);
+// #[test]
+// fn supported_resources_request() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_dummy_state();
+//     let generator = Generator::new();
+//     let combinator = Combinator::new();
+    
+//     ai.start(&state);
 
-    //     let request_msg = ExplorerToPlanet::SupportedResourceRequest {
-    //         explorer_id: 1,
-    //     };
-        
-    //     let response = ai.handle_explorer_msg(
-    //         &mut state,
-    //         &generator,
-    //         &combinator,
-    //         request_msg,
-    //     );
-        
-    //     assert!(response.is_some());
-    // }
+//     let request_msg = ExplorerToPlanet::SupportedResourceRequest {
+//         explorer_id: 1,
+//     };
+    
+//     let response = ai.handle_explorer_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         request_msg,
+//     );
+    
+//     assert!(response.is_some());
+// }
 
-    // #[test]
-    // fn available_energy_cells_request() {
-    //     let mut ai = EnterpriseAi::new();
-    //     let mut state = create_dummy_state();
-    //     let generator = Generator::new();
-    //     let combinator = Combinator::new();
-        
-    //     ai.start(&state);
-        
-    //     let request_msg = messages::ExplorerToPlanet::AvailableEnergyCellRequest {
-    //         explorer_id: 1,
-    //     };
-        
-    //     let response = ai.handle_explorer_msg(
-    //         &mut state,
-    //         &generator,
-    //         &combinator,
-    //         request_msg,
-    //     );
-        
-    //     assert!(response.is_some());
-        
-    //     match response.unwrap() {
-    //         PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
-    //             assert_eq!(available_cells, 0);
-    //         }
-    //         _ => panic!("Need AvailableEnergyCellResponse"),
-    //     }
-    // }
+// #[test]
+// fn available_energy_cells_request() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_dummy_state();
+//     let generator = Generator::new();
+//     let combinator = Combinator::new();
+    
+//     ai.start(&state);
+    
+//     let request_msg = messages::ExplorerToPlanet::AvailableEnergyCellRequest {
+//         explorer_id: 1,
+//     };
+    
+//     let response = ai.handle_explorer_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         request_msg,
+//     );
+    
+//     assert!(response.is_some());
+    
+//     match response.unwrap() {
+//         PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
+//             assert_eq!(available_cells, 0);
+//         }
+//         _ => panic!("Need AvailableEnergyCellResponse"),
+//     }
+// }
 
-    // #[test]
-    // fn incoming_explorer_request() {
-    //     let mut ai = EnterpriseAi::new();
-    //     let mut state = create_dummy_state();
-    //     let generator = Generator::new();
-    //     let combinator = Combinator::new();
-        
-    //     ai.start(&state);
+// #[test]
+// fn incoming_explorer_request() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_dummy_state();
+//     let generator = Generator::new();
+//     let combinator = Combinator::new();
+    
+//     ai.start(&state);
 
-    //     let (tx_explorer, _) = channel::<messages::PlanetToExplorer>();
-    //     let incoming_msg = OrchestratorToPlanet::IncomingExplorerRequest {
-    //         explorer_id: 1,
-    //         new_mpsc_sender: tx_explorer,
-    //     };
-        
-    //     let response = ai.handle_orchestrator_msg(
-    //         &mut state,
-    //         &generator,
-    //         &combinator,
-    //         incoming_msg,
-    //     );
-        
-    //     assert!(response.is_some());
-        
-    //     match response.unwrap() {
-    //         messages::PlanetToOrchestrator::IncomingExplorerResponse { planet_id, r} => {
-    //             assert_eq!(planet_id, 67);
-    //         }
-    //         _ => panic!("Need IncomingExplorerResponse"),
-    //     }
-    // }
+//     let (tx_explorer, _) = channel::<messages::PlanetToExplorer>();
+//     let incoming_msg = OrchestratorToPlanet::IncomingExplorerRequest {
+//         explorer_id: 1,
+//         new_mpsc_sender: tx_explorer,
+//     };
+    
+//     let response = ai.handle_orchestrator_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         incoming_msg,
+//     );
+    
+//     assert!(response.is_some());
+    
+//     match response.unwrap() {
+//         messages::PlanetToOrchestrator::IncomingExplorerResponse { planet_id, r} => {
+//             assert_eq!(planet_id, 67);
+//         }
+//         _ => panic!("Need IncomingExplorerResponse"),
+//     }
+// }
 
-    // #[test]
-    // fn outgoing_explorer_request() {
-    //     let mut ai = EnterpriseAi::new();
-    //     let mut state = create_dummy_state();
-    //     let generator = Generator::new();
-    //     let combinator = Combinator::new();
-        
-    //     ai.start(&state);
+// #[test]
+// fn outgoing_explorer_request() {
+//     let mut ai = EnterpriseAi::new();
+//     let mut state = create_dummy_state();
+//     let generator = Generator::new();
+//     let combinator = Combinator::new();
+    
+//     ai.start(&state);
 
-    //     let outgoing_msg = OrchestratorToPlanet::OutgoingExplorerRequest {
-    //         explorer_id: 1,
-    //     };
-        
-    //     let response = ai.handle_orchestrator_msg(
-    //         &mut state,
-    //         &generator,
-    //         &combinator,
-    //         outgoing_msg,
-    //     );
-        
-    //     assert!(response.is_some());
-        
-    //     match response.unwrap() {
-    //         PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, x} => {
-    //             assert_eq!(planet_id, 67);
-    //         }
-    //         _ => panic!("Need OutgoingExplorerResponse"),
-    //     }
-    // }
+//     let outgoing_msg = OrchestratorToPlanet::OutgoingExplorerRequest {
+//         explorer_id: 1,
+//     };
+    
+//     let response = ai.handle_orchestrator_msg(
+//         &mut state,
+//         &generator,
+//         &combinator,
+//         outgoing_msg,
+//     );
+    
+//     assert!(response.is_some());
+    
+//     match response.unwrap() {
+//         PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, x} => {
+//             assert_eq!(planet_id, 67);
+//         }
+//         _ => panic!("Need OutgoingExplorerResponse"),
+//     }
+// }
