@@ -17,11 +17,6 @@ use common_game::{
 
 use crossbeam_channel::{Receiver, Sender};
 
-//Note: I am not really sure how to handle the Result<(), String> of many functions
-//Should we keep track of the errors somewhere?
-//Examples: build_rocket(), ...
-
-
 //AI of the planet Enterprise
 pub struct EnterpriseAi {
     
@@ -37,6 +32,7 @@ impl PlanetAI for EnterpriseAi {
     fn start(&mut self, state: &PlanetState) {
         self.running = true;
         self.num_explorers = 0; //No explorers when the planet is created
+
         // info!("[Planet - {}] AI started",self.planet_id);
         let payload=Payload::from([
             ("action".to_string(),"start".to_string()),
@@ -98,8 +94,13 @@ impl PlanetAI for EnterpriseAi {
         }
 
         match msg {
-            OrchestratorToPlanet::StartPlanetAI => {                                        
-                self.start(state);
+            OrchestratorToPlanet::StartPlanetAI => {
+
+                //Only start the planet if it wasn't running.
+                // If there were explorers in the planet, it will set the counter to 0 despite of that
+                if !self.running{
+                    self.start(state);
+                }
 
 
                 let payload=Payload::from([
@@ -127,15 +128,17 @@ impl PlanetAI for EnterpriseAi {
                     ("has_charged_cell".to_string(),self.has_charged_cells(state).to_string())
                 ]);
 
-                              
-                match self.handle_asteroid(state, generator, combinator){
+                //handle_rocket return a rocket if the planet can defend itself - check logic in the function
+                let out_rocket = self.handle_asteroid(state, generator, combinator);
+
+                match out_rocket {
                     None => {
                         payload.insert("has_built_rocket".to_string(),false.to_string());
-                        true        // so they are the same then?
+                        true        // so they are the same then? -> What are those true for?
                     },
-                    Some(rocket)=> {
+                    Some(_)=> {
                         payload.insert("has_built_rocket".to_string(),true.to_string());
-                        true        // <-------
+                        true        // <-------  -> ?
                     },
                 };
 
@@ -154,7 +157,7 @@ impl PlanetAI for EnterpriseAi {
 
                 Some(PlanetToOrchestrator::AsteroidAck {
                     planet_id: state.id(),
-                    rocket:state.take_rocket()
+                    rocket: out_rocket,
                 })
             }
             OrchestratorToPlanet::StopPlanetAI => {                                             
@@ -179,9 +182,14 @@ impl PlanetAI for EnterpriseAi {
                 })
             }
             OrchestratorToPlanet::Sunray(sunray) => {
+                //If there is already a charged cell, the planet will always try to build a rocket
+                //If there's already a rocket, the sunray is wasted.
+
+                //If the cell is not charged, we charge it
+                // Then, we have other two possibilities: no explorers and explorers
                 // If there are no explorers, the planet will prioritize self-defense
-                // It will only try to build a rocket if it doesn't have any rocket
-                // Otherwise, it will store the energy cell for the explorers
+                    // It will only try to build a rocket if it doesn't have any rocket
+                // If there are explorers, it will store the energy cell for the explorers
 
                 let payload=Payload::from([
                     ("action".to_string(),"sunray_ack".to_string())
@@ -202,6 +210,13 @@ impl PlanetAI for EnterpriseAi {
                     ("has_rocket".to_string(),state.has_rocket().to_string())
                 ]);
 
+                //Here, if there are charged cells and no rockets, it uses the current cell to build the rocket
+                //Add logging also here?
+                if (self.has_charged_cells(state)) && !state.has_rocket(){
+                    state.build_rocket(0); //Unused result for logging
+                }
+
+                //Then, the sunray is wasted only if there's a charged cell and there was already a rocket
                 let wasted_sunray=match state.charge_cell(sunray){
                     Some(sunray)=>{
                         payload.insert("wasted_sunray".to_string(),true.to_string());   // or rather charged_cell ???
@@ -216,13 +231,8 @@ impl PlanetAI for EnterpriseAi {
                 
                 // we can move the logic below into the match and add more logs ^^^^^^^
 
-                // if self.num_explorers == 0 {
-                //     if self.has_charged_cells(state) && !state.has_rocket(){ //build_rocket does all the checks except if the energy cell is charged (even if the comment on the code says otherwise)
-                //         // state.build_rocket(0);
-                //     }
-                // }
-
-                // if the sunray can be used to charge a cell, then we can build a rocket and then charge the depleted cell
+                //This happens only when there is no explorer
+                // If the sunray can be used to charge a cell, then we can build a rocket and then charge the depleted cell
                 if self.num_explorers == 0{
                     if let Some((_,at))=state.full_cell(){
                         if let Ok(_)=state.build_rocket(at){
@@ -234,6 +244,8 @@ impl PlanetAI for EnterpriseAi {
                         }
                     }
                 }
+
+                //Add logging also for the elses?
 
                 LogEvent::new(
                     ActorType::Planet, 
@@ -305,11 +317,13 @@ impl PlanetAI for EnterpriseAi {
                 })
             }
             OrchestratorToPlanet::OutgoingExplorerRequest { explorer_id } => {                      // not called
-
+                let mut res = Ok(());
                 //Explorer exiting the planet, decrease counter
                 if self.num_explorers > 0{
                     self.num_explorers -= 1;
                 }else{
+                    res = Err("No explorer has arrived".to_string());
+
                     let payload=Payload::from([
                         ("cause".to_string(),"no_explorer_arrived_yet".to_string())
                     ]);
@@ -358,7 +372,7 @@ impl PlanetAI for EnterpriseAi {
 
                 Some(PlanetToOrchestrator::OutgoingExplorerResponse {
                     planet_id: state.id(),
-                    res: Ok(()), // This is a Result<(), String>, I didn't understand in which cases an explorer wouldn't be allowed to go out
+                    res: res, // Error if there is a negative number of explorers in the planet, otherwise Ok
                 })
             },
             OrchestratorToPlanet::KillPlanet=>{
@@ -382,7 +396,7 @@ impl PlanetAI for EnterpriseAi {
         match state.take_rocket() {
             Some(rocket) => { Some(rocket) },
             None => {
-                if let Some((_,at))=state.full_cell(){state.build_rocket(at);}
+                if let Some((_,at))=state.full_cell(){state.build_rocket(at);} //Unused result for logging?
                 state.take_rocket()
             }
         }
@@ -477,12 +491,6 @@ impl EnterpriseAi {
 
     fn has_charged_cells(&self,state:&mut PlanetState)->bool{
         //Enterprise (planet of type C) support only 1 energy cell
-        // state.cell(0).is_charged()
-        // if let Some((_,at))=state.full_cell(){
-        //     (true,Some(at))
-        // }else{
-        //     (false,None)
-        // }
         state.full_cell().is_some()
     }
 
@@ -509,7 +517,7 @@ impl EnterpriseAi {
             match new_resource {
                 Ok(new_resource) => {return Some(new_resource)},
                 Err(_) => {
-                    let payload=Payload::from([]);
+                    let payload=Payload::from([]); //Where is the logging for this
 
                 },
             }
@@ -542,6 +550,8 @@ impl EnterpriseAi {
         combinator: &Combinator,
         state: &mut PlanetState,
     ) -> Result<ComplexResource, (String, GenericResource, GenericResource)> {
+
+        //Add logging?
 
         // I didn't manage to find a way to do the energy cell check outside because of r1 and r2
         // Maybe a function would be better?
