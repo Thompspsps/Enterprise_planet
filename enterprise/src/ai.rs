@@ -710,17 +710,17 @@ pub fn create_planet(
 
 // #[cfg(test)]
 // mod tests {
-//     use common_game::{
-//         components::{
-//             asteroid::Asteroid,    
-//             energy_cell::EnergyCell,
-//             planet::{PlanetState, PlanetType},  
-//             resource::{BasicResourceType, ComplexResourceType, Generator, Combinator}, 
-//             rocket::Rocket,
-//             sunray::Sunray,        
+// use common_game::{
+//     components::{
+//         energy_cell::EnergyCell,
+//         planet::{Planet, PlanetAI, PlanetState, PlanetType},
+//         resource::*,
+//         rocket::Rocket,
+//         sunray::Sunray,
 //     },
-//         protocols::messages,
-//     };
+//     protocols::messages::{
+//         ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
+//     },
 //     use crate::ai::EnterpriseAi;
 
 //     use super::*;
