@@ -823,11 +823,11 @@ pub fn create_planet(
 //     fn sunray_message() {
 //         let mut ai = EnterpriseAi::new();
 //         let mut state = create_dummy_state();
-//         let generator = common_game::components::resource::Generator::new();
-//         let combinator = common_game::components::resource::Combinator::new();
+//         let generator = Generator::new();
+//         let combinator = Combinator::new();
         
 //         ai.start(&state);
-//         let sunray_msg = messages::OrchestratorToPlanet::Sunray(Sunray::new());
+//         let sunray_msg = OrchestratorToPlanet::Sunray(Sunray::new());
         
 //         let response = ai.handle_orchestrator_msg(
 //             &mut state,
@@ -841,12 +841,12 @@ pub fn create_planet(
     // fn asteroid_message() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
-    //     let generator = common_game::components::resource::Generator::new();
-    //     let combinator = common_game::components::resource::Combinator::new();
+    //     let generator = Generator::new();
+    //     let combinator = Combinator::new();
         
     //     ai.start(&state);
 
-    //     let asteroid_msg = messages::OrchestratorToPlanet::Asteroid(Asteroid::new());
+    //     let asteroid_msg = OrchestratorToPlanet::Asteroid(Asteroid::new());
     //     let response = ai.handle_orchestrator_msg(
     //         &mut state,
     //         &generator,
@@ -859,12 +859,12 @@ pub fn create_planet(
     // fn resource_generation_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
-    //     let generator = common_game::components::resource::Generator::new();
-    //     let combinator = common_game::components::resource::Combinator::new();
+    //     let generator = enerator::new();
+    //     let combinator = Combinator::new();
         
     //     ai.start(&state);
 
-    //     let resource_msg = messages::ExplorerToPlanet::GenerateResourceRequest {
+    //     let resource_msg =ExplorerToPlanet::GenerateResourceRequest {
     //         explorer_id: 1,
     //         resource: BasicResourceType::Carbon,
     //     };
@@ -883,12 +883,12 @@ pub fn create_planet(
     // fn supported_resources_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
-    //     let generator = common_game::components::resource::Generator::new();
-    //     let combinator = common_game::components::resource::Combinator::new();
+    //     let generator = Generator::new();
+    //     let combinator = Combinator::new();
         
     //     ai.start(&state);
 
-    //     let request_msg = messages::ExplorerToPlanet::SupportedResourceRequest {
+    //     let request_msg = ExplorerToPlanet::SupportedResourceRequest {
     //         explorer_id: 1,
     //     };
         
@@ -906,8 +906,8 @@ pub fn create_planet(
     // fn available_energy_cells_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
-    //     let generator = common_game::components::resource::Generator::new();
-    //     let combinator = common_game::components::resource::Combinator::new();
+    //     let generator = Generator::new();
+    //     let combinator = Combinator::new();
         
     //     ai.start(&state);
         
@@ -925,7 +925,7 @@ pub fn create_planet(
     //     assert!(response.is_some());
         
     //     match response.unwrap() {
-    //         messages::PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
+    //         PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
     //             assert_eq!(available_cells, 0);
     //         }
     //         _ => panic!("Need AvailableEnergyCellResponse"),
@@ -936,13 +936,13 @@ pub fn create_planet(
     // fn incoming_explorer_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
-    //     let generator = common_game::components::resource::Generator::new();
-    //     let combinator = common_game::components::resource::Combinator::new();
+    //     let generator = Generator::new();
+    //     let combinator = Combinator::new();
         
     //     ai.start(&state);
 
     //     let (tx_explorer, _) = channel::<messages::PlanetToExplorer>();
-    //     let incoming_msg = messages::OrchestratorToPlanet::IncomingExplorerRequest {
+    //     let incoming_msg = OrchestratorToPlanet::IncomingExplorerRequest {
     //         explorer_id: 1,
     //         new_mpsc_sender: tx_explorer,
     //     };
@@ -957,7 +957,7 @@ pub fn create_planet(
     //     assert!(response.is_some());
         
     //     match response.unwrap() {
-    //         messages::PlanetToOrchestrator::IncomingExplorerResponse { planet_id, res } => {
+    //         messages::PlanetToOrchestrator::IncomingExplorerResponse { planet_id, r} => {
     //             assert_eq!(planet_id, 67);
     //         }
     //         _ => panic!("Need IncomingExplorerResponse"),
@@ -968,12 +968,12 @@ pub fn create_planet(
     // fn outgoing_explorer_request() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
-    //     let generator = common_game::components::resource::Generator::new();
-    //     let combinator = common_game::components::resource::Combinator::new();
+    //     let generator = Generator::new();
+    //     let combinator = Combinator::new();
         
     //     ai.start(&state);
 
-    //     let outgoing_msg = messages::OrchestratorToPlanet::OutgoingExplorerRequest {
+    //     let outgoing_msg = OrchestratorToPlanet::OutgoingExplorerRequest {
     //         explorer_id: 1,
     //     };
         
@@ -984,10 +984,10 @@ pub fn create_planet(
     //         outgoing_msg,
     //     );
         
-    //     assert!(response.is_some(), "Should return a response for OutgoingExplorerRequest");
+    //     assert!(response.is_some());
         
     //     match response.unwrap() {
-    //         messages::PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, res } => {
+    //         PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, x} => {
     //             assert_eq!(planet_id, 67);
     //         }
     //         _ => panic!("Need OutgoingExplorerResponse"),
