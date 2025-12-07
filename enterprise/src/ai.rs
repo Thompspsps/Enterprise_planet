@@ -750,11 +750,7 @@ pub fn create_planet(
 //        state.cell_mut(0).charge(Sunray::new());
 //        state
 //    }
-// fn create_state_with_rocket() -> PlanetState {
-//         let mut state = create_state_with_charged_cell();
-//         let _ = state.build_rocket(0);
-//         state
-//     }
+// 
 
 
 //     #[test]
@@ -768,7 +764,7 @@ pub fn create_planet(
 //         ai.stop(&dummy_state);
 //         assert!(!ai.is_running());
 //     }
-// #[test]
+//      #[test]
     // fn test_sunray_charging() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
