@@ -856,7 +856,6 @@ impl EnterpriseAi {
 
                 match complex {
                     Ok(complex) => {
-                    // 添加：组合成功的日志
                     let success_payload = Payload::from([
                         ("action".to_string(), "combine_success".to_string()),
                         ("resource".to_string(), "Diamond".to_string()),
@@ -875,7 +874,6 @@ impl EnterpriseAi {
                     Ok(ComplexResource::Diamond(complex))
                 },
                 Err((s, r1, r2)) => {
-                    // 添加：组合失败的日志
                     let fail_payload = Payload::from([
                         ("error".to_string(), "combine_failed".to_string()),
                         ("request_type".to_string(), "Diamond".to_string()),
@@ -973,7 +971,6 @@ impl EnterpriseAi {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                    // 添加：没有能量细胞的具体错误日志
                     let error_payload = Payload::from([
                         ("error".to_string(), "no_energy_cell_available".to_string()),
                         ("request_type".to_string(), "Life".to_string()),
