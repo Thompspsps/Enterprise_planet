@@ -839,7 +839,7 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 }
     #[test]
 fn asteroid_message() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_dummy_state();
     let generator = Generator::new();
     let combinator = Combinator::new();
@@ -857,7 +857,7 @@ fn asteroid_message() {
 }    
 #[test]
 fn resource_generation_request() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_dummy_state();
     let generator = Generator::new();
     let combinator = Combinator::new();
@@ -881,7 +881,7 @@ fn resource_generation_request() {
 
 #[test]
 fn supported_resources_request() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_dummy_state();
     let generator = Generator::new();
     let combinator = Combinator::new();
@@ -904,7 +904,7 @@ fn supported_resources_request() {
 
 #[test]
 fn available_energy_cells_request() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_dummy_state();
     let generator = Generator::new();
     let combinator = Combinator::new();
@@ -934,7 +934,7 @@ fn available_energy_cells_request() {
 
 #[test]
 fn incoming_explorer_request() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_dummy_state();
     let generator = Generator::new();
     let combinator = Combinator::new();
@@ -958,7 +958,7 @@ fn incoming_explorer_request() {
 }
 #[test]
 fn outgoing_explorer_request() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_dummy_state();
     let generator = Generator::new();
     let combinator = Combinator::new();
@@ -979,7 +979,7 @@ fn outgoing_explorer_request() {
 }
 #[test]
 fn complex_resource_combination() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_state_with_charged_cell();
     let generator = Generator::new();
     let mut combinator = Combinator::new();
@@ -1009,7 +1009,7 @@ fn complex_resource_combination() {
 }
 #[test]
 fn ai_stopped() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_dummy_state();
     let generator = Generator::new();
     let combinator = Combinator::new();
@@ -1039,7 +1039,7 @@ fn ai_stopped() {
 }
 #[test]
 fn kill_planet() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_dummy_state();
     let generator = Generator::new();
     let combinator = Combinator::new();
@@ -1058,7 +1058,7 @@ fn kill_planet() {
 }
 #[test]
 fn resource_generation_without_energy() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_dummy_state(); // now i believe there isn't energy cell in it
     let mut generator = Generator::new();
     let combinator = Combinator::new();  
@@ -1079,7 +1079,7 @@ fn resource_generation_without_energy() {
 }
 #[test]
 fn unsupported_resource_request() {
-    let mut ai = EnterpriseAi::new();
+    let mut ai = EnterpriseAi::new(67);
     let mut state = create_state_with_charged_cell();
     let generator = Generator::new(); 
     let combinator = Combinator::new();
