@@ -837,7 +837,7 @@ pub fn create_planet(
 //         );       
 //         assert!(response.is_some());
 //}
-    // #[test]
+//     #[test]
     // fn test_asteroid_message() {
     //     let mut ai = EnterpriseAi::new();
     //     let mut state = create_dummy_state();
@@ -855,4 +855,141 @@ pub fn create_planet(
     //     );
         
     //     assert!(response.is_some());
+    // #[test]
+    // fn test_resource_generation_request() {
+    //     let mut ai = EnterpriseAi::new();
+    //     let mut state = create_dummy_state();
+    //     let generator = common_game::components::resource::Generator::new();
+    //     let combinator = common_game::components::resource::Combinator::new();
+        
+    //     ai.start(&state);
 
+    //     let resource_msg = messages::ExplorerToPlanet::GenerateResourceRequest {
+    //         explorer_id: 1,
+    //         resource: BasicResourceType::Carbon,
+    //     };
+        
+    //     let response = ai.handle_explorer_msg(
+    //         &mut state,
+    //         &generator,
+    //         &combinator,
+    //         resource_msg,
+    //     );
+        
+    //     assert!(response.is_some());
+    // }
+
+    // #[test]
+    // fn test_supported_resources_request() {
+    //     let mut ai = EnterpriseAi::new();
+    //     let mut state = create_dummy_state();
+    //     let generator = common_game::components::resource::Generator::new();
+    //     let combinator = common_game::components::resource::Combinator::new();
+        
+    //     ai.start(&state);
+
+    //     let request_msg = messages::ExplorerToPlanet::SupportedResourceRequest {
+    //         explorer_id: 1,
+    //     };
+        
+    //     let response = ai.handle_explorer_msg(
+    //         &mut state,
+    //         &generator,
+    //         &combinator,
+    //         request_msg,
+    //     );
+        
+    //     assert!(response.is_some());
+    // }
+
+    // #[test]
+    // fn test_available_energy_cells_request() {
+    //     let mut ai = EnterpriseAi::new();
+    //     let mut state = create_dummy_state();
+    //     let generator = common_game::components::resource::Generator::new();
+    //     let combinator = common_game::components::resource::Combinator::new();
+        
+    //     ai.start(&state);
+        
+    //     let request_msg = messages::ExplorerToPlanet::AvailableEnergyCellRequest {
+    //         explorer_id: 1,
+    //     };
+        
+    //     let response = ai.handle_explorer_msg(
+    //         &mut state,
+    //         &generator,
+    //         &combinator,
+    //         request_msg,
+    //     );
+        
+    //     assert!(response.is_some());
+        
+    //     match response.unwrap() {
+    //         messages::PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
+    //             assert_eq!(available_cells, 0);
+    //         }
+    //         _ => panic!("Need AvailableEnergyCellResponse"),
+    //     }
+    // }
+
+    // #[test]
+    // fn test_incoming_explorer_request() {
+    //     let mut ai = EnterpriseAi::new();
+    //     let mut state = create_dummy_state();
+    //     let generator = common_game::components::resource::Generator::new();
+    //     let combinator = common_game::components::resource::Combinator::new();
+        
+    //     ai.start(&state);
+
+    //     let (tx_explorer, _) = channel::<messages::PlanetToExplorer>();
+    //     let incoming_msg = messages::OrchestratorToPlanet::IncomingExplorerRequest {
+    //         explorer_id: 1,
+    //         new_mpsc_sender: tx_explorer,
+    //     };
+        
+    //     let response = ai.handle_orchestrator_msg(
+    //         &mut state,
+    //         &generator,
+    //         &combinator,
+    //         incoming_msg,
+    //     );
+        
+    //     assert!(response.is_some());
+        
+    //     match response.unwrap() {
+    //         messages::PlanetToOrchestrator::IncomingExplorerResponse { planet_id, res } => {
+    //             assert_eq!(planet_id, 67);
+    //         }
+    //         _ => panic!("Need IncomingExplorerResponse"),
+    //     }
+    // }
+
+    // #[test]
+    // fn test_outgoing_explorer_request() {
+    //     let mut ai = EnterpriseAi::new();
+    //     let mut state = create_dummy_state();
+    //     let generator = common_game::components::resource::Generator::new();
+    //     let combinator = common_game::components::resource::Combinator::new();
+        
+    //     ai.start(&state);
+
+    //     let outgoing_msg = messages::OrchestratorToPlanet::OutgoingExplorerRequest {
+    //         explorer_id: 1,
+    //     };
+        
+    //     let response = ai.handle_orchestrator_msg(
+    //         &mut state,
+    //         &generator,
+    //         &combinator,
+    //         outgoing_msg,
+    //     );
+        
+    //     assert!(response.is_some(), "Should return a response for OutgoingExplorerRequest");
+        
+    //     match response.unwrap() {
+    //         messages::PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, res } => {
+    //             assert_eq!(planet_id, 67);
+    //         }
+    //         _ => panic!("Need OutgoingExplorerResponse"),
+    //     }
+    // }
