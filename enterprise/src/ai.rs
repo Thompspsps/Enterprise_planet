@@ -430,11 +430,34 @@ impl PlanetAI for EnterpriseAi {
         // If there is no rocket, it tries to build one
         // If this does not work, it returns None
         match state.take_rocket() {
-            Some(rocket) => Some(rocket),
+            Some(rocket) => { 
+            let payload = Payload::from([("defense".to_string(), "using_existing_rocket".to_string())]);
+            LogEvent::new(
+                ActorType::Planet,
+                self.planet_id,
+                ActorType::SelfActor,
+                "self".to_string(),
+                EventType::InternalPlanetAction,
+                Channel::Info,
+                payload,
+            ).emit();
+            Some(rocket) 
+        },
             None => {
                 if let Some((_, at)) = state.full_cell() {
                     state.build_rocket(at);
-                } // Unused result for logging?
+                } else {
+                let payload = Payload::from([("warning".to_string(), "no_charged_cell_for_rocket".to_string())]);
+                LogEvent::new(
+                    ActorType::Planet,
+                    self.planet_id,
+                    ActorType::SelfActor,
+                    "self".to_string(),
+                    EventType::InternalPlanetAction,
+                    Channel::Warning,
+                    payload,
+                ).emit();
+            }// Unused result for logging?
                 state.take_rocket()
             }
         }
@@ -447,7 +470,7 @@ impl PlanetAI for EnterpriseAi {
         combinator: &Combinator,
         msg: ExplorerToPlanet,
     ) -> Option<PlanetToExplorer> {
-        let explorer_id = msg.explorer_id();
+         let explorer_id = msg.explorer_id();
          if !self.is_running() {
          let payload = Payload::from([
             ("error".to_string(), "ai_not_running".to_string()),
@@ -675,6 +698,50 @@ impl EnterpriseAi {
         combinator: &Combinator,
         state: &mut PlanetState,
     ) -> Result<ComplexResource, (String, GenericResource, GenericResource)> {
+        let request_type = match &request {
+        ComplexResourceRequest::Water(_, _) => "Water",
+        ComplexResourceRequest::Diamond(_, _) => "Diamond",
+        ComplexResourceRequest::Life(_, _) => "Life",
+        ComplexResourceRequest::Robot(_, _) => "Robot",
+        ComplexResourceRequest::Dolphin(_, _) => "Dolphin",
+        ComplexResourceRequest::AIPartner(_, _) => "AIPartner",
+    };
+        match state.full_cell() {
+        Some((c, i)) => {
+            let cell_payload = Payload::from([
+                ("action".to_string(), "found_charged_cell".to_string()),
+                ("cell_index".to_string(), i.to_string()),
+                ("request_type".to_string(), request_type.to_string()),
+            ]);
+            
+            LogEvent::new(
+                ActorType::Planet,
+                self.planet_id,
+                ActorType::SelfActor,
+                "self".to_string(),
+                EventType::InternalPlanetAction,
+                Channel::Debug,
+                cell_payload,
+            ).emit();
+        }
+        None => {
+            let no_cell_payload = Payload::from([
+                ("action".to_string(), "no_charged_cell_for_combine".to_string()),
+                ("request_type".to_string(), request_type.to_string()),
+            ]);
+            
+            LogEvent::new(
+                ActorType::Planet,
+                self.planet_id,
+                ActorType::SelfActor,
+                "self".to_string(),
+                EventType::InternalPlanetAction,
+                Channel::Warning,
+                no_cell_payload,
+            ).emit();
+        }
+    }
+
         //Add logging?
 
         // I didn't manage to find a way to do the energy cell check outside because of r1 and r2
@@ -692,139 +759,418 @@ impl EnterpriseAi {
             ComplexResourceRequest::AIPartner(r1, r2) => {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
-                    None => {
-                        return Err((
-                            "No energy cell available".to_string(),
-                            GenericResource::ComplexResources(ComplexResource::Robot(r1)),
-                            GenericResource::ComplexResources(ComplexResource::Diamond(r2)),
-                        ));
-                    }
-                };
-
-                let complex = combinator.make_aipartner(r1, r2, energy_cell);
-
-                match complex {
-                    Ok(complex) => Ok(ComplexResource::AIPartner(complex)),
-                    Err((s, r1, r2)) => Err((
-                        s,
+                None => {
+                    let error_payload = Payload::from([
+                        ("error".to_string(), "no_energy_cell_available".to_string()),
+                        ("request_type".to_string(), "AIPartner".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        error_payload,
+                    ).emit();
+                    
+                    return Err((
+                        "No energy cell available".to_string(),
                         GenericResource::ComplexResources(ComplexResource::Robot(r1)),
                         GenericResource::ComplexResources(ComplexResource::Diamond(r2)),
-                    )),
+                    ))
+                },
+            };
+               let complex = combinator.make_aipartner(r1, r2, energy_cell);
+
+               match complex {
+                Ok(complex) => {
+                    let success_payload = Payload::from([
+                        ("action".to_string(), "combine_success".to_string()),
+                        ("resource".to_string(), "AIPartner".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Info,
+                        success_payload,
+                    ).emit();
+                    
+                    Ok(ComplexResource::AIPartner(complex))
+                },
+                Err((s, r1, r2)) => {
+                    let fail_payload = Payload::from([
+                        ("error".to_string(), "combine_failed".to_string()),
+                        ("request_type".to_string(), "AIPartner".to_string()),
+                        ("error_message".to_string(), s.clone()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        fail_payload,
+                    ).emit();
+                    
+                    Err((s,
+                        GenericResource::ComplexResources(ComplexResource::Robot(r1)),
+                        GenericResource::ComplexResources(ComplexResource::Diamond(r2))))
                 }
             }
+        },
             // The "Diamond" complex resource takes Carbon + Carbon
             ComplexResourceRequest::Diamond(r1, r2) => {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        return Err((
-                            "No energy cell available".to_string(),
-                            GenericResource::BasicResources(BasicResource::Carbon(r1)),
-                            GenericResource::BasicResources(BasicResource::Carbon(r2)),
-                        ));
-                    }
-                };
+                    let error_payload = Payload::from([
+                        ("error".to_string(), "no_energy_cell_available".to_string()),
+                        ("request_type".to_string(), "Diamond".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        error_payload,
+                    ).emit();
+                    
+                    return Err(("No energy cell available".to_string(),
+                                GenericResource::BasicResources(BasicResource::Carbon(r1)),
+                                GenericResource::BasicResources(BasicResource::Carbon(r2))))
+                },
+            };
 
                 let complex = combinator.make_diamond(r1, r2, energy_cell);
 
                 match complex {
-                    Ok(complex) => Ok(ComplexResource::Diamond(complex)),
-                    Err((s, r1, r2)) => Err((
-                        s,
+                    Ok(complex) => {
+                    // 添加：组合成功的日志
+                    let success_payload = Payload::from([
+                        ("action".to_string(), "combine_success".to_string()),
+                        ("resource".to_string(), "Diamond".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Info,
+                        success_payload,
+                    ).emit();
+                    
+                    Ok(ComplexResource::Diamond(complex))
+                },
+                Err((s, r1, r2)) => {
+                    // 添加：组合失败的日志
+                    let fail_payload = Payload::from([
+                        ("error".to_string(), "combine_failed".to_string()),
+                        ("request_type".to_string(), "Diamond".to_string()),
+                        ("error_message".to_string(), s.clone()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        fail_payload,
+                    ).emit();
+                    
+                    Err((s,
                         GenericResource::BasicResources(BasicResource::Carbon(r1)),
-                        GenericResource::BasicResources(BasicResource::Carbon(r2)),
-                    )),
+                        GenericResource::BasicResources(BasicResource::Carbon(r2))))
                 }
             }
+        },
             // The "Dolphin" complex resource takes Water + Life
             ComplexResourceRequest::Dolphin(r1, r2) => {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        return Err((
-                            "No energy cell available".to_string(),
-                            GenericResource::ComplexResources(ComplexResource::Water(r1)),
-                            GenericResource::ComplexResources(ComplexResource::Life(r2)),
-                        ));
-                    }
-                };
+                    let error_payload = Payload::from([
+                        ("error".to_string(), "no_energy_cell_available".to_string()),
+                        ("request_type".to_string(), "Dolphin".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        error_payload,
+                    ).emit();
+                    
+                    return Err(("No energy cell available".to_string(),
+                                GenericResource::ComplexResources(ComplexResource::Water(r1)),
+                                GenericResource::ComplexResources(ComplexResource::Life(r2))))
+                },
+            };
 
                 let complex = combinator.make_dolphin(r1, r2, energy_cell);
 
                 match complex {
-                    Ok(complex) => Ok(ComplexResource::Dolphin(complex)),
-                    Err((s, r1, r2)) => Err((
-                        s,
+                Ok(complex) => {
+                    let success_payload = Payload::from([
+                        ("action".to_string(), "combine_success".to_string()),
+                        ("resource".to_string(), "Dolphin".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Info,
+                        success_payload,
+                    ).emit();
+                    
+                    Ok(ComplexResource::Dolphin(complex))
+                },
+                Err((s, r1, r2)) => {
+                    let fail_payload = Payload::from([
+                        ("error".to_string(), "combine_failed".to_string()),
+                        ("request_type".to_string(), "Dolphin".to_string()),
+                        ("error_message".to_string(), s.clone()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        fail_payload,
+                    ).emit();
+                    
+                    Err((s,
                         GenericResource::ComplexResources(ComplexResource::Water(r1)),
-                        GenericResource::ComplexResources(ComplexResource::Life(r2)),
-                    )),
+                        GenericResource::ComplexResources(ComplexResource::Life(r2))))
                 }
             }
+        },
             // The "Life" complex resource takes Water + Carbon
             ComplexResourceRequest::Life(r1, r2) => {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        return Err((
-                            "No energy cell available".to_string(),
-                            GenericResource::ComplexResources(ComplexResource::Water(r1)),
-                            GenericResource::BasicResources(BasicResource::Carbon(r2)),
-                        ));
-                    }
-                };
+                    // 添加：没有能量细胞的具体错误日志
+                    let error_payload = Payload::from([
+                        ("error".to_string(), "no_energy_cell_available".to_string()),
+                        ("request_type".to_string(), "Life".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        error_payload,
+                    ).emit();
+                    
+                    return Err(("No energy cell available".to_string(),
+                                GenericResource::ComplexResources(ComplexResource::Water(r1)),
+                                GenericResource::BasicResources(BasicResource::Carbon(r2))))
+                },
+            };
 
                 let complex = combinator.make_life(r1, r2, energy_cell);
 
                 match complex {
-                    Ok(complex) => Ok(ComplexResource::Life(complex)),
-                    Err((s, r1, r2)) => Err((
-                        s,
+                Ok(complex) => {
+                    let success_payload = Payload::from([
+                        ("action".to_string(), "combine_success".to_string()),
+                        ("resource".to_string(), "Life".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Info,
+                        success_payload,
+                    ).emit();
+                    
+                    Ok(ComplexResource::Life(complex))
+                },
+                Err((s, r1, r2)) => {
+                    let fail_payload = Payload::from([
+                        ("error".to_string(), "combine_failed".to_string()),
+                        ("request_type".to_string(), "Life".to_string()),
+                        ("error_message".to_string(), s.clone()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        fail_payload,
+                    ).emit();
+                    
+                    Err((s,
                         GenericResource::ComplexResources(ComplexResource::Water(r1)),
-                        GenericResource::BasicResources(BasicResource::Carbon(r2)),
-                    )),
+                        GenericResource::BasicResources(BasicResource::Carbon(r2))))
                 }
             }
+        },
             // The "Robot" complex resource takes Silicon + Life
             ComplexResourceRequest::Robot(r1, r2) => {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        return Err((
-                            "No energy cell available".to_string(),
-                            GenericResource::BasicResources(BasicResource::Silicon(r1)),
-                            GenericResource::ComplexResources(ComplexResource::Life(r2)),
-                        ));
-                    }
-                };
+                    let error_payload = Payload::from([
+                        ("error".to_string(), "no_energy_cell_available".to_string()),
+                        ("request_type".to_string(), "Robot".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        error_payload,
+                    ).emit();
+                    
+                    return Err(("No energy cell available".to_string(),
+                                GenericResource::BasicResources(BasicResource::Silicon(r1)),
+                                GenericResource::ComplexResources(ComplexResource::Life(r2))))
+                },
+            };
 
                 let complex = combinator.make_robot(r1, r2, energy_cell);
 
                 match complex {
-                    Ok(complex) => Ok(ComplexResource::Robot(complex)),
-                    Err((s, r1, r2)) => Err((
-                        s,
+                    Ok(complex) => {
+                    let success_payload = Payload::from([
+                        ("action".to_string(), "combine_success".to_string()),
+                        ("resource".to_string(), "Robot".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Info,
+                        success_payload,
+                    ).emit();
+                    
+                    Ok(ComplexResource::Robot(complex))
+                },
+                Err((s, r1, r2)) => {
+                    let fail_payload = Payload::from([
+                        ("error".to_string(), "combine_failed".to_string()),
+                        ("request_type".to_string(), "Robot".to_string()),
+                        ("error_message".to_string(), s.clone()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        fail_payload,
+                    ).emit();
+                    
+                    Err((s,
                         GenericResource::BasicResources(BasicResource::Silicon(r1)),
-                        GenericResource::ComplexResources(ComplexResource::Life(r2)),
-                    )),
+                        GenericResource::ComplexResources(ComplexResource::Life(r2))))
                 }
-            }
+            
             // The "Water" complex resource takes Hydrogen + Oxygen
             ComplexResourceRequest::Water(r1, r2) => {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        return Err((
-                            "No energy cell available".to_string(),
-                            GenericResource::BasicResources(BasicResource::Hydrogen(r1)),
-                            GenericResource::BasicResources(BasicResource::Oxygen(r2)),
-                        ));
-                    }
-                };
+                    let error_payload = Payload::from([
+                        ("error".to_string(), "no_energy_cell_available".to_string()),
+                        ("request_type".to_string(), "Water".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        error_payload,
+                    ).emit();
+                    
+                    return Err(("No energy cell available".to_string(),
+                                GenericResource::BasicResources(BasicResource::Hydrogen(r1)),
+                                GenericResource::BasicResources(BasicResource::Oxygen(r2))))
+                },
+            };
 
                 let complex = combinator.make_water(r1, r2, energy_cell);
 
                 match complex {
-                    Ok(complex) => Ok(ComplexResource::Water(complex)),
+                    Ok(complex) => {
+                    let success_payload = Payload::from([
+                        ("action".to_string(), "combine_success".to_string()),
+                        ("resource".to_string(), "Water".to_string()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Info,
+                        success_payload,
+                    ).emit();
+                    
+                    Ok(ComplexResource::Water(complex))
+                },
+                Err((s, r1, r2)) => {
+                    let fail_payload = Payload::from([
+                        ("error".to_string(), "combine_failed".to_string()),
+                        ("request_type".to_string(), "Water".to_string()),
+                        ("error_message".to_string(), s.clone()),
+                    ]);
+                    
+                    LogEvent::new(
+                        ActorType::Planet,
+                        self.planet_id,
+                        ActorType::SelfActor,
+                        "self".to_string(),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        fail_payload,
+                    ).emit();
                     Err((s, r1, r2)) => Err((
                         s,
                         GenericResource::BasicResources(BasicResource::Hydrogen(r1)),
