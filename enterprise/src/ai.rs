@@ -823,7 +823,7 @@ pub fn create_planet(
 //     }
 // #[test]
 //     fn ai_should_start_n_stop() {
-//         let mut ai = EnterpriseAi::new();
+//         let mut ai = EnterpriseAi::new(67);
 //         let dummy_state = create_dummy_state();
 
 //         ai.start(&dummy_state);
