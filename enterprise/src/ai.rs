@@ -745,6 +745,17 @@ pub fn create_planet(
 //             can_have_rocket: true,
 //         }
 //     }
+//     fn create_state_with_charged_cell() -> PlanetState {
+//        let mut state = create_dummy_state();
+//        state.cell_mut(0).charge(Sunray::new());
+//        state
+//    }
+// fn create_state_with_rocket() -> PlanetState {
+//         let mut state = create_state_with_charged_cell();
+//         let _ = state.build_rocket(0);
+//         state
+//     }
+
 
 //     #[test]
 //     fn ai_should_start_n_stop() {
@@ -757,15 +768,40 @@ pub fn create_planet(
 //         ai.stop(&dummy_state);
 //         assert!(!ai.is_running());
 //     }
-
-//     #[test]
+// #[test]
+    // fn test_sunray_charging() {
+    //     let mut ai = EnterpriseAi::new();
+    //     let mut state = create_dummy_state();
+    //     let generator = Generator::new();
+    //     let combinator = Combinator::new();
+        
+    //     ai.start(&state);
+        
+    //     let sunray_msg = OrchestratorToPlanet::Sunray(Sunray::new());
+    //     let response = ai.handle_orchestrator_msg(
+    //         &mut state,
+    //         &generator,
+    //         &combinator,
+    //         sunray_msg,
+    //     );
+        
+    //     assert!(response.is_some());
+    //     assert!(state.cell(0).is_charged());
+    // }
+//      #[test]
 //     fn test_planet_creation() {
 //         // let (tx_orchestrator,rx_orchestrator)=channel();
 //         // let (tx_explorer,rx_explorer)=channel();
 
 //         // let planet=create_planet(rx_orchestrator, tx_orchestrator, rx_explorer, tx_explorer);
-
-//         // assert_eq!(planet.id(),67);
-//         // assert_eq!(planet.planet_type(),PlanetType::C);
+        
+//         assert_eq!(planet.id(), 67);
+//         assert_eq!(planet.planet_type(), PlanetType::C);
+        
+//         let state = planet.state();
+//         assert_eq!(state.cells_count(), 1);
+//         assert!(!state.has_rocket());
+//         assert!(state.can_have_rocket());
 //     }
+// }
 // }
