@@ -71,6 +71,7 @@ impl PlanetAI for EnterpriseAi {
         combinator: &Combinator,
         msg: OrchestratorToPlanet,
     ) -> Option<PlanetToOrchestrator> {
+        
         if !self.is_running() && !matches!(msg, OrchestratorToPlanet::StartPlanetAI) {
             // Matches returns whether the given expression matches the provided pattern
             // warn!("[Planet - {}] AI received message while stopped",self.planet_id);
@@ -97,6 +98,7 @@ impl PlanetAI for EnterpriseAi {
 
             return None;
         }
+        
 
         match msg {
             OrchestratorToPlanet::StartPlanetAI => {
@@ -435,9 +437,22 @@ impl PlanetAI for EnterpriseAi {
         combinator: &Combinator,
         msg: ExplorerToPlanet,
     ) -> Option<PlanetToExplorer> {
-        if !self.is_running() {
-            return None;
-        }
+         if !self.is_running() {
+         let payload = Payload::from([
+            ("error".to_string(), "ai_not_running".to_string()),
+            ("explorer_id".to_string(), explorer_id.to_string()),
+        ]);
+        LogEvent::new(
+            ActorType::Planet,
+            self.planet_id,
+            ActorType::Explorer,
+            explorer_id.to_string(),
+            EventType::MessageExplorerToPlanet,
+            Channel::Warning,
+            payload,
+        ).emit();
+        return None;
+    }
 
         match msg {
             ExplorerToPlanet::AvailableEnergyCellRequest { .. } => {
