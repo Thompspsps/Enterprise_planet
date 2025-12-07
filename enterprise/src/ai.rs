@@ -1081,7 +1081,7 @@ pub fn create_planet(
 //     assert!(response.is_some());
 
 // #[test]
-// fn test_unsupported_resource_request() {
+// fn unsupported_resource_request() {
 //     let mut ai = EnterpriseAi::new();
 //     let mut state = create_state_with_charged_cell();
 //     let generator = Generator::new(); 
@@ -1101,4 +1101,3 @@ pub fn create_planet(
 //     );
     
 //     assert!(response.is_some());
-//     match response.unwrap() {
