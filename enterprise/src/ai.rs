@@ -753,9 +753,11 @@ pub fn create_planet(
 //        state.cell_mut(0).charge(Sunray::new());
 //        state
 //    }
-// 
-
-
+//     fn create_state_with_rocket() -> PlanetState {
+//         let mut state = create_test_state_with_charged_cell();
+//         let _ = state.build_rocket(0);
+//         state
+//     }
 //     #[test]
 //     fn ai_should_start_n_stop() {
 //         let mut ai = EnterpriseAi::new();
@@ -802,5 +804,57 @@ pub fn create_planet(
 //         assert!(!state.has_rocket());
 //         assert!(state.can_have_rocket());
 //     }
-// }
-// }
+//     #[test]
+//     fn test_asteroid_defense_with_rocket() {
+//         let mut ai = EnterpriseAi::new();
+//         let mut state = create_state_with_rocket();
+//         let generator = Generator::new();
+//         let combinator = Combinator::new();
+//         ai.start(&state);        
+//         let asteroid_msg = OrchestratorToPlanet::Asteroid(Asteroid::new());
+//         let response = ai.handle_orchestrator_msg(
+//             &mut state,
+//             &generator,
+//             &combinator,
+//             asteroid_msg,
+//         );
+        
+//     assert!(response.is_some());
+//    }
+// #[test]
+//     fn test_sunray_message() {
+//         let mut ai = EnterpriseAi::new();
+//         let mut state = create_dummy_state();
+//         let generator = common_game::components::resource::Generator::new();
+//         let combinator = common_game::components::resource::Combinator::new();
+        
+//         ai.start(&state);
+//         let sunray_msg = messages::OrchestratorToPlanet::Sunray(Sunray::new());
+        
+//         let response = ai.handle_orchestrator_msg(
+//             &mut state,
+//             &generator,
+//             &combinator,
+//             sunray_msg,
+//         );       
+//         assert!(response.is_some());
+//}
+    // #[test]
+    // fn test_asteroid_message() {
+    //     let mut ai = EnterpriseAi::new();
+    //     let mut state = create_dummy_state();
+    //     let generator = common_game::components::resource::Generator::new();
+    //     let combinator = common_game::components::resource::Combinator::new();
+        
+    //     ai.start(&state);
+
+    //     let asteroid_msg = messages::OrchestratorToPlanet::Asteroid(Asteroid::new());
+    //     let response = ai.handle_orchestrator_msg(
+    //         &mut state,
+    //         &generator,
+    //         &combinator,
+    //         asteroid_msg,
+    //     );
+        
+    //     assert!(response.is_some());
+
