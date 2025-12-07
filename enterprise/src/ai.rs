@@ -128,7 +128,8 @@ impl PlanetAI for EnterpriseAi {
                     ("has_charged_cell".to_string(),self.has_charged_cells(state).to_string())
                 ]);
 
-                let destroyed=match self.handle_asteroid(state, generator, combinator){
+                              
+                match self.handle_asteroid(state, generator, combinator){
                     None => {
                         payload.insert("has_built_rocket".to_string(),false.to_string());
                         true        // so they are the same then?
@@ -154,7 +155,7 @@ impl PlanetAI for EnterpriseAi {
 
                 Some(PlanetToOrchestrator::AsteroidAck {
                     planet_id: state.id(),
-                    destroyed
+                    rocket:state.take_rocket()
                 })
             }
             OrchestratorToPlanet::StopPlanetAI => {                                             
@@ -360,6 +361,9 @@ impl PlanetAI for EnterpriseAi {
                     planet_id: state.id(),
                     res: Ok(()), // This is a Result<(), String>, I didn't understand in which cases an explorer wouldn't be allowed to go out
                 })
+            },
+            OrchestratorToPlanet::KillPlanet=>{
+                Some(PlanetToOrchestrator::KillPlanetResult { planet_id: state.id() })
             }
         }
     }
@@ -379,7 +383,7 @@ impl PlanetAI for EnterpriseAi {
         match state.take_rocket() {
             Some(rocket) => { Some(rocket) },
             None => {
-                if self.has_charged_cells(state){state.build_rocket(0);}
+                if let Some((_,at))=state.full_cell(){state.build_rocket(at);}
                 state.take_rocket()
             }
         }
@@ -471,24 +475,17 @@ impl EnterpriseAi {
         ).emit();
         self.running
     }
-    fn has_charged_cells(&self,state:&PlanetState)->bool{
+
+    fn has_charged_cells(&self,state:&mut PlanetState)->bool{
         //Enterprise (planet of type C) support only 1 energy cell
-        state.cell(0).is_charged()
+        // state.cell(0).is_charged()
+        // if let Some((_,at))=state.full_cell(){
+        //     (true,Some(at))
+        // }else{
+        //     (false,None)
+        // }
+        state.full_cell().is_some()
     }
-// Do we need this function?    no actually
-    // pub fn deplete_charged_cell(&self, state: &mut PlanetState) -> Result<(), String> {
-    //     // match state.cell_mut(0).discharge(){
-    //     //     Ok(_)=>true,
-    //     //     Err(_)=>false   // maybe handle error
-    //     // }
-    //
-    //     if let Some((energy_cell, _)) = state.full_cell() {
-    //         energy_cell.discharge();
-    //         Ok(())
-    //     } else {
-    //         Err("No charged energy cells available".to_string())
-    //     }
-    // }
 
     fn handle_resource_request(
         &mut self,
@@ -670,12 +667,13 @@ impl EnterpriseAi {
 }
 
 pub fn create_planet(
+    // id: u32,
     rx_orchestrator: Receiver<OrchestratorToPlanet>,
     tx_orchestrator: Sender<PlanetToOrchestrator>,
     rx_explorer: Receiver<ExplorerToPlanet>,
     //tx_explorer: Sender<PlanetToExplorer>,
 ) -> Planet {
-    let id = 67;
+    let id = 67;        // according to the planet mod we are supposed to hard code a id for the planet
     let ai = Box::new(EnterpriseAi::new(id));
     let gen_rules = vec![BasicResourceType::Carbon];
     let comb_rules = vec![
