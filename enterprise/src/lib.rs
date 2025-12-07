@@ -437,7 +437,14 @@ pub fn create_planet(
 //Implement more tests to show during the faire
 #[cfg(test)]
 mod tests {
-    use common_game::{components::planet, protocols::messages};
+    use common_game::{
+    components::{
+        energy_cell::EnergyCell,
+        planet::PlanetState,
+        rocket::Rocket,
+    },
+    protocols::messages,
+};
 
     use super::*;
     use std::sync::mpsc::{Receiver, Sender, channel};
@@ -455,7 +462,12 @@ mod tests {
     }
 
     fn create_dummy_state() -> PlanetState {
-        unimplemented!()
+        PlanetState {
+            id: 67,
+            energy_cells: vec![EnergyCell::new()],
+            rocket: None,
+            can_have_rocket: true,
+        }
     }
 
     #[test]
