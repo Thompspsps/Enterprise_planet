@@ -13,8 +13,6 @@ use common_game::{
     logging::*,
 };
 
-
-
 use crossbeam_channel::{Receiver, Sender};
 
 //AI of the planet Enterprise
@@ -676,13 +674,13 @@ impl EnterpriseAi {
 }
 
 pub fn create_planet(
-    // id: u32,
+    id: u32,
     rx_orchestrator: Receiver<OrchestratorToPlanet>,
     tx_orchestrator: Sender<PlanetToOrchestrator>,
     rx_explorer: Receiver<ExplorerToPlanet>,
     //tx_explorer: Sender<PlanetToExplorer>,
 ) -> Planet {
-    let id = 67;        // according to the planet mod we are supposed to hard code a id for the planet
+    let id = id;        //I checked and they said the planet should use the id that was given as a parameter during its creation.
     let ai = Box::new(EnterpriseAi::new(id));
     let gen_rules = vec![BasicResourceType::Carbon];
     let comb_rules = vec![
