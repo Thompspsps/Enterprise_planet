@@ -752,7 +752,7 @@ pub fn create_planet(
 //        state
 //    }
 //     fn create_state_with_rocket() -> PlanetState {
-//         let mut state = create_test_state_with_charged_cell();
+//         let mut state = create_state_with_charged_cell();
 //         let _ = state.build_rocket(0);
 //         state
 //     }
