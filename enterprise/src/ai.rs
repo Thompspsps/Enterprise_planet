@@ -1104,7 +1104,8 @@ impl EnterpriseAi {
                         GenericResource::BasicResources(BasicResource::Silicon(r1)),
                         GenericResource::ComplexResources(ComplexResource::Life(r2))))
                 }
-            
+            }
+        },        
             // The "Water" complex resource takes Hydrogen + Oxygen
             ComplexResourceRequest::Water(r1, r2) => {
                 let energy_cell = match state.full_cell() {
@@ -1168,14 +1169,13 @@ impl EnterpriseAi {
                         Channel::Error,
                         fail_payload,
                     ).emit();
-                    Err((s, r1, r2)) => Err((
-                        s,
+                    Err((s,
                         GenericResource::BasicResources(BasicResource::Hydrogen(r1)),
-                        GenericResource::BasicResources(BasicResource::Oxygen(r2)),
-                    )),
+                        GenericResource::BasicResources(BasicResource::Oxygen(r2))))
+                
                 }
             }
-        }
+        },
     }
 }
 
@@ -1211,7 +1211,7 @@ pub fn create_planet(
         Err(error) => panic!("{error}"), // Need to handle properly error case
     }
 }
-
+}
 // #[cfg(test)]
 // mod tests {
 // use common_game::{
