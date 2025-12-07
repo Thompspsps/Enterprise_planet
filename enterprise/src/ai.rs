@@ -10,11 +10,13 @@ use common_game::{
     protocols::messages::{
         ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
     },
+    logging::*,
 };
 
-use std::collections::HashSet;
-use std::sync::mpsc::{Receiver, Sender, channel};
-use std::time::SystemTime;
+
+
+use std::sync::mpsc::{Receiver, Sender};
+use log::{error,info,warn};                 // for logging (independently from the log component)
 
 //Note: I am not really sure how to handle the Result<(), String> of many functions
 //Should we keep track of the errors somewhere?
@@ -23,22 +25,49 @@ use std::time::SystemTime;
 
 //AI of the planet Enterprise
 pub struct EnterpriseAi {
+    
     // This parameter the current state of the AI
     running: bool,
     // This parameter represents how many explorers are on the planet
     num_explorers: u8,
+
+    planet_id:u32       // planet id for logging purposes
 }
 
 impl PlanetAI for EnterpriseAi {
     fn start(&mut self, state: &PlanetState) {
-        // Setting the planet parameters
         self.running = true;
         self.num_explorers = 0; //No explorers when the planet is created
+        // info!("[Planet - {}] AI started",self.planet_id);
+        let payload=Payload::from([
+            ("action".to_string(),"start".to_string()),
+            ("explorer_count".to_string(),self.num_explorers.to_string())
+        ]);
+        LogEvent::new(
+            ActorType::Planet,
+            self.planet_id,
+            ActorType::SelfActor,
+            "self".to_string(),
+            EventType::InternalPlanetAction,
+            Channel::Info,
+            payload
+        ).emit();
     }
 
     fn stop(&mut self, state: &PlanetState) {
         self.running = false;
         self.num_explorers = 0; //They are all dead
+        // info!("[Planet - {}] AI stopped",self.planet_id);
+
+        let payload=Payload::from([("action".to_string(),"stopped".to_string())]);
+        LogEvent::new(ActorType::Planet,
+            self.planet_id, 
+            ActorType::SelfActor, 
+            "self".to_string(),
+            EventType::InternalPlanetAction,
+            Channel::Info,
+            payload
+        ).emit();
     }
 
     fn handle_orchestrator_msg(
@@ -48,51 +77,173 @@ impl PlanetAI for EnterpriseAi {
         combinator: &Combinator,
         msg: OrchestratorToPlanet,
     ) -> Option<PlanetToOrchestrator> {
-        if !self.is_running() {
-            return match msg {
-                OrchestratorToPlanet::StartPlanetAI => {
-                    self.start(state);
-                    Some(PlanetToOrchestrator::StartPlanetAIResult {
-                        planet_id: state.id(),
-                    })
-                }
-                _ => None,
-            };
+        if !self.is_running() && !matches!(msg,OrchestratorToPlanet::StartPlanetAI) {       // matches returns whether the given expression matches the provided pattern
+            // warn!("[Planet - {}] AI received message while stopped",self.planet_id);    // msg does not implement Debug trait so it can't be printed
+
+            let payload=Payload::from([
+                ("message_type".to_string(),"orchestrator_to_planet:start_planet_ai".to_string()),
+                ("state".to_string(),"not_yet_stopped".to_string())         // or stopped, whatever you feel is more suitable
+            ]);
+
+            LogEvent::new(
+                ActorType::Planet, 
+                self.planet_id, 
+                ActorType::Orchestrator,
+                "orchestrator".to_string(), 
+                EventType::MessageOrchestratorToPlanet,
+                Channel::Warning,
+                payload
+            ).emit();
+
+            return None;
         }
 
         match msg {
-            OrchestratorToPlanet::StartPlanetAI => {
+            OrchestratorToPlanet::StartPlanetAI => {                                        
                 self.start(state);
+
+
+                let payload=Payload::from([
+                    ("action".to_string(),"start_ack".to_string())
+                ]);
+
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::Orchestrator,
+                    "orchestrator".to_string(), 
+                    EventType::MessagePlanetToOrchestrator,
+                    Channel::Info,
+                    payload
+                ).emit();
+
                 Some(PlanetToOrchestrator::StartPlanetAIResult {
                     planet_id: state.id(),
                 })
             }
-            OrchestratorToPlanet::Asteroid(asteroid) => {
+            OrchestratorToPlanet::Asteroid(asteroid) => {                           
+                let mut payload=Payload::from([
+                    ("action".to_string(),"asteroid_ack".to_string()),
+                    ("has_rocket".to_string(),state.has_rocket().to_string()),
+                    ("has_charged_cell".to_string(),self.has_charged_cells(state).to_string())
+                ]);
+
+                let destroyed=match self.handle_asteroid(state, generator, combinator){
+                    None => {
+                        payload.insert("has_built_rocket".to_string(),false.to_string());
+                        true        // so they are the same then?
+                    },
+                    Some(rocket)=> {
+                        payload.insert("has_built_rocket".to_string(),true.to_string());
+                        true        // <-------
+                    },
+                };
+
+                // payload.insert("was_destroyed".to_string(),destroyed.to_string());
+
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::Orchestrator,
+                    "orchestrator".to_string(), 
+                    EventType::MessagePlanetToOrchestrator,
+                    Channel::Info,
+                    payload
+                ).emit();
+
+
                 Some(PlanetToOrchestrator::AsteroidAck {
                     planet_id: state.id(),
-                    destroyed: match self.handle_asteroid(state, generator, combinator){
-                        None => true,
-                        Some(rocket)=> true,
-                    },
+                    destroyed
                 })
             }
-            OrchestratorToPlanet::StopPlanetAI => {
+            OrchestratorToPlanet::StopPlanetAI => {                                             
                 self.stop(state);
+
+                let payload=Payload::from([
+                    ("action".to_string(),"stop_ack".to_string())
+                ]);
+
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::Orchestrator,
+                    "orchestrator".to_string(), 
+                    EventType::MessageOrchestratorToPlanet,
+                    Channel::Info,
+                    payload
+                ).emit();
+
                 Some(PlanetToOrchestrator::StopPlanetAIResult {
                     planet_id: state.id(),
                 })
             }
             OrchestratorToPlanet::Sunray(sunray) => {
-                state.charge_cell(sunray);
-
                 // If there are no explorers, the planet will prioritize self-defense
                 // It will only try to build a rocket if it doesn't have any rocket
-                //Otherwise, it will store the energy cell for the explorers
-                if self.num_explorers == 0 {
-                    if self.has_charged_cells(state) && !state.has_rocket(){ //build_rocket does all the checks except if the energy cell is charged (even if the comment on the code says otherwise)
-                        state.build_rocket(0);
+                // Otherwise, it will store the energy cell for the explorers
+
+                let payload=Payload::from([
+                    ("action".to_string(),"sunray_ack".to_string())
+                ]);
+
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::Orchestrator,
+                    "orchestrator".to_string(), 
+                    EventType::MessageOrchestratorToPlanet,
+                    Channel::Info,
+                    payload
+                ).emit();
+
+                let mut payload=Payload::from([
+                    ("visiting_explorers".to_string(),self.num_explorers.to_string()),
+                    ("has_rocket".to_string(),state.has_rocket().to_string())
+                ]);
+
+                let wasted_sunray=match state.charge_cell(sunray){
+                    Some(sunray)=>{
+                        payload.insert("wasted_sunray".to_string(),true.to_string());   // or rather charged_cell ???
+                        Some(sunray)
+                    },
+                    None=>{
+                        payload.insert("wasted_sunray".to_string(),false.to_string());
+                        None
+                    }
+                };
+
+                
+                // we can move the logic below into the match and add more logs ^^^^^^^
+
+                // if self.num_explorers == 0 {
+                //     if self.has_charged_cells(state) && !state.has_rocket(){ //build_rocket does all the checks except if the energy cell is charged (even if the comment on the code says otherwise)
+                //         // state.build_rocket(0);
+                //     }
+                // }
+
+                // if the sunray can be used to charge a cell, then we can build a rocket and then charge the depleted cell
+                if self.num_explorers == 0{
+                    if let Some((_,at))=state.full_cell(){
+                        if let Ok(_)=state.build_rocket(at){
+                            payload.insert("has_built_rocket".to_string(),true.to_string());
+                            if let Some(sunray)=wasted_sunray{
+                                payload.insert("has_charged_cell".to_string(),true.to_string());
+                                state.charge_cell(sunray);
+                            }
+                        }
                     }
                 }
+
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::SelfActor,
+                    "self".to_string(), 
+                    EventType::InternalPlanetAction,
+                    Channel::Debug,
+                    payload
+                ).emit();
 
                 //Return acknowledgement
                 Some(PlanetToOrchestrator::SunrayAck {
@@ -100,23 +251,110 @@ impl PlanetAI for EnterpriseAi {
                 })
             }
             OrchestratorToPlanet::InternalStateRequest => {
+                let payload=Payload::from([("request".to_string(),"internal_state".to_string())]);
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::Orchestrator,
+                    "orchestrator".to_string(), 
+                    EventType::MessageOrchestratorToPlanet,     // still have to decide: log from orch(MessageOrchestratorToPlanet) and pl(MessagePlanetToOrchestrator) ?
+                    Channel::Info,
+                    payload
+                ).emit();
+
                 // Create a dummy struct containing an overview of the internal state of a planet.
-                let out=PlanetState::to_dummy(state);
-                Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: out})
+                let dummy_state=PlanetState::to_dummy(state);
+                Some(PlanetToOrchestrator::InternalStateResponse { planet_id: state.id(), planet_state: dummy_state})
             }
-            OrchestratorToPlanet::IncomingExplorerRequest { explorer_id, new_mpsc_sender, } => {
+            OrchestratorToPlanet::IncomingExplorerRequest { explorer_id, new_mpsc_sender, } => {        // not called
                 //Explorer coming to the planet, increase counter
                 self.num_explorers += 1;
+
+                let payload=Payload::from([
+                    ("action".to_string(),"explorer_arrival".to_string())
+                ]);
+
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::Orchestrator,
+                    "orchestrator".to_string(), 
+                    EventType::MessageOrchestratorToPlanet,
+                    Channel::Info,
+                    payload
+                ).emit();
+
+                let payload=Payload::from([
+                    ("in_explorer_id".to_string(),explorer_id.to_string()),
+                    ("visiting_explorers".to_string(),self.num_explorers.to_string())
+                ]);
+
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::SelfActor,
+                    "self".to_string(), 
+                    EventType::InternalExplorerAction,
+                    Channel::Debug,
+                    payload
+                ).emit();
 
                 Some(PlanetToOrchestrator::IncomingExplorerResponse {
                     planet_id: state.id(),
                     res: Ok(()), // This is a Result<(), String>, I didn't understand in which cases an explorer wouldn't be accepted
                 })
             }
-            OrchestratorToPlanet::OutgoingExplorerRequest { explorer_id } => {
+            OrchestratorToPlanet::OutgoingExplorerRequest { explorer_id } => {                      // not called
 
                 //Explorer exiting the planet, decrease counter
-                self.num_explorers -= 1;
+                if self.num_explorers > 0{
+                    self.num_explorers -= 1;
+                }else{
+                    let payload=Payload::from([
+                        ("cause".to_string(),"no_explorer_arrived_yet".to_string())
+                    ]);
+
+                    LogEvent::new(
+                        ActorType::Planet, 
+                        self.planet_id, 
+                        ActorType::SelfActor,
+                        "self".to_string(), 
+                        EventType::InternalExplorerAction,
+                        Channel::Debug,
+                        payload
+                    ).emit();
+                }
+                
+
+                let payload=Payload::from([
+                    ("action".to_string(),"explorer_departure".to_string())
+                ]);
+
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::Orchestrator,
+                    "orchestrator".to_string(), 
+                    EventType::MessageOrchestratorToPlanet,
+                    Channel::Info,
+                    payload
+                ).emit();
+
+                let payload=Payload::from([
+                    ("out_explorer_id".to_string(),explorer_id.to_string()),
+                    ("visiting_explorers".to_string(),self.num_explorers.to_string())
+                ]);
+
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::SelfActor,
+                    "self".to_string(), 
+                    EventType::InternalExplorerAction,
+                    Channel::Debug,
+                    payload
+                ).emit();
+
 
                 Some(PlanetToOrchestrator::OutgoingExplorerResponse {
                     planet_id: state.id(),
@@ -132,12 +370,12 @@ impl PlanetAI for EnterpriseAi {
         generator: &Generator,
         combinator: &Combinator,
     ) -> Option<Rocket> {
-        if !self.running {
-            return None;
-        }
+        if !self.is_running() { return None; }
+
         //This function tries to take a rocket from the planet
         //If there is no rocket, it tries to build one
         //If this does not work, it returns None
+
         match state.take_rocket() {
             Some(rocket) => { Some(rocket) },
             None => {
@@ -199,17 +437,45 @@ impl PlanetAI for EnterpriseAi {
 //There were already functions that did the exact same thing, same checks...
 //If you disagree, we can discuss it and maybe implement it again
 impl EnterpriseAi {
-    pub fn new() -> Self {
-        Self { running: false, num_explorers: 0 }
+    pub fn new(planet_id:u32) -> Self {
+        let payload=Payload::from([
+            ("action".to_string(),"init".to_string()),
+            ("planet_type".to_string(),"C".to_string())
+        ]);
+
+        LogEvent::new(
+            ActorType::Orchestrator,
+            LogEvent::id_from_str("orchestrator"),
+            ActorType::Planet,
+            planet_id.to_string(),
+            EventType::InternalOrchestratorAction,
+            Channel::Info,
+            payload,
+        ).emit();
+
+        Self { running: false, num_explorers: 0,planet_id }
     }
     pub fn is_running(&self) -> bool {
+        let payload=Payload::from([
+            ("is_running".to_string(),self.running.to_string())
+        ]);
+
+        LogEvent::new(
+            ActorType::Planet,
+            self.planet_id,
+            ActorType::SelfActor,
+            "self".to_string(),
+            EventType::InternalPlanetAction,
+            Channel::Debug,
+            payload,
+        ).emit();
         self.running
     }
     fn has_charged_cells(&self,state:&PlanetState)->bool{
         //Enterprise (planet of type C) support only 1 energy cell
         state.cell(0).is_charged()
     }
-// Do we need this function?
+// Do we need this function?    no actually
     // pub fn deplete_charged_cell(&self, state: &mut PlanetState) -> Result<(), String> {
     //     // match state.cell_mut(0).discharge(){
     //     //     Ok(_)=>true,
@@ -246,7 +512,10 @@ impl EnterpriseAi {
 
             match new_resource {
                 Ok(new_resource) => {return Some(new_resource)},
-                Err(_) => {}, //Handle error?
+                Err(_) => {
+                    let payload=Payload::from([]);
+
+                },
             }
 
             // Do we need to match the request?
@@ -401,14 +670,13 @@ impl EnterpriseAi {
 }
 
 pub fn create_planet(
-    id: u8,
     rx_orchestrator: Receiver<OrchestratorToPlanet>,
     tx_orchestrator: Sender<PlanetToOrchestrator>,
     rx_explorer: Receiver<ExplorerToPlanet>,
-    tx_explorer: Sender<PlanetToExplorer>,
+    //tx_explorer: Sender<PlanetToExplorer>,
 ) -> Planet {
-    //let id = 67; // huhhhhhhhhhhhhhh....do we have to agree upon id values? -> We need to ask this, we cannot have planets with the same id
-    let ai = Box::new(EnterpriseAi::new());
+    let id = 67;
+    let ai = Box::new(EnterpriseAi::new(id));
     let gen_rules = vec![BasicResourceType::Carbon];
     let comb_rules = vec![
         ComplexResourceType::Water,
@@ -430,66 +698,5 @@ pub fn create_planet(
     ) {
         Ok(planet) => planet,
         Err(error) => panic!("{error}"), // need to handle properly error case
-    }
-}
-
-//Should we create another file for the tests?
-//Implement more tests to show during the faire
-#[cfg(test)]
-mod tests {
-    use common_game::{
-    components::{
-        energy_cell::EnergyCell,
-        planet::PlanetState,
-        rocket::Rocket,
-    },
-    protocols::messages,
-};
-
-    use super::*;
-    use std::sync::mpsc::{Receiver, Sender, channel};
-    use std::time::SystemTime;
-
-    #[test]
-    fn is_one_equal_to_one() {
-        assert_eq!(1, 1)
-    }
-
-    #[test]
-    fn test_ai_initial_state_should_not_be_running() {
-        let ai = EnterpriseAi::new();
-        assert!(!ai.is_running());
-    }
-
-    fn create_dummy_state() -> PlanetState {
-        PlanetState {
-            id: 67,
-            energy_cells: vec![EnergyCell::new()],
-            rocket: None,
-            can_have_rocket: true,
-        }
-    }
-
-    #[test]
-    fn ai_should_start_n_stop() {
-        let mut ai = EnterpriseAi::new();
-        let dummy_state = create_dummy_state();
-
-        ai.start(&dummy_state);
-        assert!(ai.is_running());
-
-        ai.stop(&dummy_state);
-        assert!(!ai.is_running());
-    }
-
-    #[test]
-    fn test_planet_creation() {
-        // let (tx_orchestrator,rx_orchestrator)=channel();
-        // let (tx_explorer,rx_explorer)=channel();
-
-        // let planet=create_planet(rx_orchestrator, tx_orchestrator, rx_explorer, tx_explorer);
-
-        // assert_eq!(planet.id(),67);
-        // assert_eq!(planet.planet_type(),PlanetType::C);
     }
 }

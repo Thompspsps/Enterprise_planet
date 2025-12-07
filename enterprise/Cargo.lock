@@ -17,6 +17,7 @@ name = "enterprise"
 version = "0.1.0"
 dependencies = [
  "common-game",
+ "log",
 ]
 
 [[package]]

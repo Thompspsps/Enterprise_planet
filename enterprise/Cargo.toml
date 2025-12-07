@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 common-game = { git = "https://github.com/unitn-ap-2025/common.git" }
+log = "0.4.29"
