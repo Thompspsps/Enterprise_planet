@@ -1,5 +1,4 @@
 mod ai;
-mod tests;
 
 // #[allow(unused_imports)]
 // use common_game::{
