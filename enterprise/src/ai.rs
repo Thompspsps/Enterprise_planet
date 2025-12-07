@@ -770,6 +770,21 @@ pub fn create_planet(
 //         assert!(!ai.is_running());
 //     }
 //     #[test]
+//     fn planet_creation() {
+//         let (tx_orchestrator,rx_orchestrator)=channel();
+//         let (tx_explorer,rx_explorer)=channel();
+
+//         let planet=create_planet(rx_orchestrator, tx_orchestrator, rx_explorer, tx_explorer);
+        
+//         assert_eq!(planet.id(), 67);
+//         assert_eq!(planet.planet_type(), PlanetType::C);
+        
+//         let state = planet.state();
+//         assert_eq!(state.cells_count(), 1);
+//         assert!(!state.has_rocket());
+//         assert!(state.can_have_rocket());
+//     }
+//     #[test]
 //     fn sunray_charging() {
 //         let mut ai = EnterpriseAi::new();
 //         let mut state = create_dummy_state();
@@ -789,21 +804,7 @@ pub fn create_planet(
 //         assert!(response.is_some());
 //         assert!(state.cell(0).is_charged());
 //     }
-//     #[test]
-//     fn planet_creation() {
-//         let (tx_orchestrator,rx_orchestrator)=channel();
-//         let (tx_explorer,rx_explorer)=channel();
 
-//         let planet=create_planet(rx_orchestrator, tx_orchestrator, rx_explorer, tx_explorer);
-        
-//         assert_eq!(planet.id(), 67);
-//         assert_eq!(planet.planet_type(), PlanetType::C);
-        
-//         let state = planet.state();
-//         assert_eq!(state.cells_count(), 1);
-//         assert!(!state.has_rocket());
-//         assert!(state.can_have_rocket());
-//     }
 //     #[test]
 //     fn asteroid_defensed_by_rocket() {
 //         let mut ai = EnterpriseAi::new();
