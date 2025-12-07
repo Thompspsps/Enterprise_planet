@@ -412,9 +412,19 @@ impl PlanetAI for EnterpriseAi {
         generator: &Generator,
         combinator: &Combinator,
     ) -> Option<Rocket> {
-        if !self.is_running() {
-            return None;
-        }
+        if !self.is_running() { 
+        let payload = Payload::from([("error".to_string(), "ai_not_running".to_string())]);
+        LogEvent::new(
+            ActorType::Planet,
+            self.planet_id,
+            ActorType::SelfActor,
+            "self".to_string(),
+            EventType::InternalPlanetAction,
+            Channel::Warning,
+            payload,
+        ).emit();
+        return None; 
+    }
 
         // This function tries to take a rocket from the planet
         // If there is no rocket, it tries to build one
@@ -437,6 +447,7 @@ impl PlanetAI for EnterpriseAi {
         combinator: &Combinator,
         msg: ExplorerToPlanet,
     ) -> Option<PlanetToExplorer> {
+        let explorer_id = msg.explorer_id();
          if !self.is_running() {
          let payload = Payload::from([
             ("error".to_string(), "ai_not_running".to_string()),
@@ -548,23 +559,95 @@ impl EnterpriseAi {
         state: &mut PlanetState,
     ) -> Option<BasicResource> {
         if !generator.contains(request) {
-            return None;
+        let payload = Payload::from([
+            ("error".to_string(), "unsupported_resource".to_string()),
+            ("requested_resource".to_string(), format!("{:?}", request)),
+        ]);
+        LogEvent::new(
+            ActorType::Planet,
+            self.planet_id,
+            ActorType::SelfActor,
+            "self".to_string(),
+            EventType::InternalPlanetAction,
+            Channel::Warning,
+            payload,
+        ).emit();
+        return None;
         } else {
             let energy_cell = match state.full_cell() {
-                Some((c, _)) => c,
-                None => return None,
-            };
+            Some((c, i)) => {
+                let payload = Payload::from([
+                    ("action".to_string(), "using_charged_cell".to_string()),
+                    ("cell_index".to_string(), i.to_string()),
+                ]);
+                LogEvent::new(
+                    ActorType::Planet,
+                    self.planet_id,
+                    ActorType::SelfActor,
+                    "self".to_string(),
+                    EventType::InternalPlanetAction,
+                    Channel::Debug,
+                    payload,
+                ).emit();
+                c
+            }
+            None => {
+                let payload = Payload::from([
+                    ("error".to_string(), "no_charged_cell".to_string()),
+                ]);
+                LogEvent::new(
+                    ActorType::Planet,
+                    self.planet_id,
+                    ActorType::SelfActor,
+                    "self".to_string(),
+                    EventType::InternalPlanetAction,
+                    Channel::Warning,
+                    payload,
+                ).emit();
+                return None;
+            }
+        };
 
             let new_resource = generator
                 .make_carbon(energy_cell)
                 .map(|new_carbon| BasicResource::Carbon(new_carbon));
 
             match new_resource {
-                Ok(new_resource) => return Some(new_resource),
-                Err(_) => {
-                    let payload = Payload::from([]); //Where is the logging for this
-                }
+            Ok(new_resource) => {
+                let payload = Payload::from([
+                    ("action".to_string(), "resource_generated".to_string()),
+                    ("resource".to_string(), "Carbon".to_string()),
+                ]);
+                LogEvent::new(
+                    ActorType::Planet,
+                    self.planet_id,
+                    ActorType::SelfActor,
+                    "self".to_string(),
+                    EventType::InternalPlanetAction,
+                    Channel::Info,
+                    payload,
+                ).emit();
+                return Some(new_resource);
             }
+            Err(e) => {
+                let payload = Payload::from([
+                    ("error".to_string(), "generation_failed".to_string()),
+                    ("error_message".to_string(), e),
+                ]);
+                LogEvent::new(
+                    ActorType::Planet,
+                    self.planet_id,
+                    ActorType::SelfActor,
+                    "self".to_string(),
+                    EventType::InternalPlanetAction,
+                    Channel::Error,
+                    payload,
+                ).emit();
+            }
+        };
+    }
+    None
+    }
 
             // Do we need to match the request?
             // Because if generator contains request, we know it is carbon.
@@ -584,9 +667,7 @@ impl EnterpriseAi {
             //         Err(_) => {}, //Handle error?
             //     }
             // }
-        }
-        None
-    }
+    
 
     fn handle_combine_request(
         &mut self,
