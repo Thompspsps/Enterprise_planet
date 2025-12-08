@@ -27,9 +27,8 @@ impl PlanetAI for EnterpriseAi {
         self.running = true; // Flags the parameter to true, the planet is active
         self.num_explorers = 0; // There are no explorers when the planet is created
 
-        // info!("[Planet - {}] AI started",self.planet_id);
         let payload = Payload::from([
-            ("action".to_string(), "start".to_string()),
+            ("action".to_string(), "started".to_string()),
             ("explorer_count".to_string(), self.num_explorers.to_string()),
         ]);
 
@@ -48,7 +47,6 @@ impl PlanetAI for EnterpriseAi {
     fn stop(&mut self, state: &PlanetState) {
         self.running = false; // Flags the parameter to false, the planet is stopped
         self.num_explorers = 0; // The number of explorers is brought to zero
-        // info!("[Planet - {}] AI stopped",self.planet_id);
 
         let payload = Payload::from([("action".to_string(), "stopped".to_string())]);
 
@@ -77,12 +75,10 @@ impl PlanetAI for EnterpriseAi {
             // warn!("[Planet - {}] AI received message while stopped",self.planet_id);
             // The msg does not implement Debug trait, so it can't be printed
 
-            let payload = Payload::from([
-                (
-                    "message_type".to_string(),
-                    "orchestrator_to_planet:start_planet_ai".to_string(),
-                ),
-                ("state".to_string(), "not_yet_stopped".to_string()), // or stopped, whatever you feel is more suitable
+            let payload=Payload::from([
+                ("warning_msg".to_string(),"inactive_ai".to_string()),       
+                ("action".to_string(),"none".to_string()),
+                ("state".to_string(),"not_yet_started".to_string())         
             ]);
 
             LogEvent::new(
@@ -115,38 +111,33 @@ impl PlanetAI for EnterpriseAi {
                     self.planet_id,
                     ActorType::Orchestrator,
                     "orchestrator".to_string(),
-                    EventType::MessagePlanetToOrchestrator,
+                    EventType::MessageOrchestratorToPlanet,
                     Channel::Info,
                     payload,
                 )
                 .emit();
 
                 Some(PlanetToOrchestrator::StartPlanetAIResult {
-                    planet_id: state.id(),
+                    planet_id: self.planet_id,
                 })
             }
 
-            OrchestratorToPlanet::Asteroid(asteroid) => {
+            OrchestratorToPlanet::Asteroid(_) => {
                 let mut payload = Payload::from([
                     ("action".to_string(), "asteroid_ack".to_string()),
                     ("has_rocket".to_string(), state.has_rocket().to_string()),
-                    (
-                        "has_charged_cell".to_string(),
-                        self.has_charged_cells(state).to_string(),
-                    ),
+                    ("has_charged_cells".to_string(),self.has_charged_cells(state).to_string()),
                 ]);
 
                 // The handle_rocket returns a rocket if the planet can defend itself - check logic in the function
-                let out_rocket = self.handle_asteroid(state, generator, combinator);
+                let rocket = self.handle_asteroid(state, generator, combinator);
 
-                match out_rocket {
+                match rocket {
                     None => {
                         payload.insert("has_built_rocket".to_string(), false.to_string());
-                        true // so they are the same then? -> What are those true for?
                     }
                     Some(_) => {
                         payload.insert("has_built_rocket".to_string(), true.to_string());
-                        true // <-------  -> ?
                     }
                 };
 
@@ -157,15 +148,15 @@ impl PlanetAI for EnterpriseAi {
                     self.planet_id,
                     ActorType::Orchestrator,
                     "orchestrator".to_string(),
-                    EventType::MessagePlanetToOrchestrator,
+                    EventType::MessageOrchestratorToPlanet,
                     Channel::Info,
                     payload,
                 )
                 .emit();
 
                 Some(PlanetToOrchestrator::AsteroidAck {
-                    planet_id: state.id(),
-                    rocket: out_rocket,
+                    planet_id: self.planet_id,
+                    rocket,
                 })
             }
             OrchestratorToPlanet::StopPlanetAI => {
@@ -185,7 +176,7 @@ impl PlanetAI for EnterpriseAi {
                 .emit();
 
                 Some(PlanetToOrchestrator::StopPlanetAIResult {
-                    planet_id: state.id(),
+                    planet_id: self.planet_id,
                 })
             }
             OrchestratorToPlanet::Sunray(sunray) => {
@@ -197,63 +188,118 @@ impl PlanetAI for EnterpriseAi {
                 // It will only try to build a rocket if it doesn't have any rocket
                 // If there are explorers, it will store the energy cell for the explorers
 
-                let payload = Payload::from([("action".to_string(), "sunray_ack".to_string())]);
+                let had_charged_cell=self.has_charged_cells(state);
 
-                LogEvent::new(
-                    ActorType::Planet,
-                    self.planet_id,
-                    ActorType::Orchestrator,
-                    "orchestrator".to_string(),
-                    EventType::MessageOrchestratorToPlanet,
-                    Channel::Info,
-                    payload,
-                )
-                .emit();
-
-                let mut payload = Payload::from([
-                    (
-                        "visiting_explorers".to_string(),
-                        self.num_explorers.to_string(),
-                    ),
-                    ("has_rocket".to_string(), state.has_rocket().to_string()),
+                let mut payload=Payload::from([
+                    ("visiting_explorers".to_string(),self.num_explorers.to_string()),
+                    ("has_rocket".to_string(),state.has_rocket().to_string()),
+                    ("had_charged_cells".to_string(),had_charged_cell.to_string())
                 ]);
 
-                // Here, if there are charged cells and no rockets, it uses the current cell to build the rocket
-                // Add logging also here?
-                if (self.has_charged_cells(state)) && !state.has_rocket() {
-                    state.build_rocket(0); // Unused result for logging
-                }
+                LogEvent::new(
+                    ActorType::Planet, 
+                    self.planet_id, 
+                    ActorType::Orchestrator,
+                    "orchestrator".to_string(), 
+                    EventType::MessageOrchestratorToPlanet,
+                    Channel::Info,
+                    Payload::from([("action".to_string(),"sunray_ack".to_string())])
+                ).emit();
 
-                // Then, the sunray is wasted only if there's a charged cell and there was already a rocket
-                let wasted_sunray = match state.charge_cell(sunray) {
-                    Some(sunray) => {
-                        payload.insert("wasted_sunray".to_string(), true.to_string()); // or rather charged_cell ???
-                        Some(sunray)
-                    }
-                    None => {
-                        payload.insert("wasted_sunray".to_string(), false.to_string());
-                        None
-                    }
-                };
+                // here the planet tries to build a rocket with a charged cell 
+                let mut rocket_built=false;
+                if had_charged_cell && !state.has_rocket()/*&& state.can_have_rocket()*/{
+                    if let Some((_,at))=state.full_cell(){
+                        match state.build_rocket(at){
+                            Ok(_)=>{
+                                rocket_built=true;
+                                payload.insert("has_built_rocket_with_existing_charged_cells".to_string(),true.to_string());
 
-                // We can move the logic below into the match and add more logs ^^^^^^^
-
-                // This happens only when there is no explorer
-                // If the sunray can be used to charge a cell, then we can build a rocket and then charge the depleted cell
-                if self.num_explorers == 0 {
-                    if let Some((_, at)) = state.full_cell() {
-                        if let Ok(_) = state.build_rocket(at) {
-                            payload.insert("has_built_rocket".to_string(), true.to_string());
-                            if let Some(sunray) = wasted_sunray {
-                                payload.insert("has_charged_cell".to_string(), true.to_string());
-                                state.charge_cell(sunray);
+                                LogEvent::new(
+                                    ActorType::Planet,
+                                    self.planet_id,
+                                    ActorType::SelfActor,
+                                    "self".to_string(),
+                                    EventType::InternalPlanetAction,
+                                    Channel::Info,
+                                    Payload::from([("action".to_string(),"built_rocket".to_string())])
+                                ).emit();
+                            },
+                            Err(e)=>{
+                                payload.insert("build_rocket_error".to_string(),e);
+                            
+                                LogEvent::new(
+                                    ActorType::Planet,
+                                    self.planet_id,
+                                    ActorType::SelfActor,
+                                    "self".to_string(),
+                                    EventType::InternalPlanetAction,
+                                    Channel::Warning,
+                                    Payload::from([("action".to_string(),"rocket_build_failed".to_string())])
+                                ).emit();
                             }
                         }
                     }
                 }
 
-                // Add logging also for the elses?
 
+                match state.charge_cell(sunray){
+                    Some(_)=>{
+                        payload.insert("received_sunray".to_string(),"wasted".to_string());
+
+                        LogEvent::new(
+                            ActorType::Planet,
+                            self.planet_id,
+                            ActorType::SelfActor,
+                            "self".to_string(),
+                            EventType::InternalPlanetAction,
+                            Channel::Debug,
+                            Payload::from([("action".to_string(),"sunray_wasted".to_string())])
+                        ).emit();
+                    },
+                    None=>{
+                        payload.insert("received_sunray".to_string(),"used".to_string());
+
+                        LogEvent::new(
+                            ActorType::Planet,
+                            self.planet_id,
+                            ActorType::SelfActor,
+                            "self".to_string(),
+                            EventType::InternalPlanetAction,
+                            Channel::Debug,
+                            Payload::from([("action".to_string(),"sunray_used".to_string())])
+                        ).emit();
+
+                        if self.num_explorers==0 && !state.has_rocket()/*&& state.can_have_rocket()*/{
+                            if let Some((_,at))=state.full_cell(){
+                                match state.build_rocket(at){
+                                    Ok(_)=>{
+                                        rocket_built=true;
+                                        payload.insert("has_built_rocket_with_new_energy_cell".to_string(),true.to_string());
+
+                                        LogEvent::new(
+                                            ActorType::Planet,
+                                            self.planet_id,
+                                            ActorType::SelfActor,
+                                            "self".to_string(),
+                                            EventType::InternalPlanetAction,
+                                            Channel::Warning,
+                                            Payload::from([("action".to_string(),"has_built_rocket_with_new_energy_cell".to_string())])
+                                        ).emit();
+                                    },
+                                    Err(e)=>{
+                                        payload.insert("has_built_rocket_with_new_energy_cell".to_string(),false.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                payload.insert("final_has_rocket".to_string(),state.has_rocket().to_string());
+                payload.insert("has_charged_cells".to_string(),self.has_charged_cells(state).to_string());
+                payload.insert("rocket_build".to_string(),rocket_built.to_string());
+                
                 LogEvent::new(
                     ActorType::Planet,
                     self.planet_id,
@@ -262,8 +308,7 @@ impl PlanetAI for EnterpriseAi {
                     EventType::InternalPlanetAction,
                     Channel::Debug,
                     payload,
-                )
-                .emit();
+                ).emit();
 
                 // Return acknowledgement
                 Some(PlanetToOrchestrator::SunrayAck {
@@ -279,7 +324,7 @@ impl PlanetAI for EnterpriseAi {
                     self.planet_id,
                     ActorType::Orchestrator,
                     "orchestrator".to_string(),
-                    EventType::MessageOrchestratorToPlanet, // Still have to decide: log from orch(MessageOrchestratorToPlanet) and pl(MessagePlanetToOrchestrator) ?
+                    EventType::MessageOrchestratorToPlanet,
                     Channel::Info,
                     payload,
                 )
@@ -296,7 +341,6 @@ impl PlanetAI for EnterpriseAi {
                 explorer_id,
                 new_mpsc_sender,
             } => {
-                // not called
                 self.num_explorers += 1; // The number of explorers inside the planet is increased, the explorer is coming
 
                 let payload =
@@ -343,7 +387,7 @@ impl PlanetAI for EnterpriseAi {
                 if self.num_explorers > 0 {
                     self.num_explorers -= 1; // The number of explorers inside the planet is decreased, the explorer is leaving
                 } else {
-                    res = Err("No explorer has arrived".to_string());
+                    res = Err("No explorer has arrived yet".to_string());
 
                     let payload = Payload::from([(
                         "cause".to_string(),
@@ -397,12 +441,28 @@ impl PlanetAI for EnterpriseAi {
 
                 Some(PlanetToOrchestrator::OutgoingExplorerResponse {
                     planet_id: state.id(),
-                    res: res, // Error if there is a negative number of explorers in the planet, otherwise Ok
+                    res, // Error if there is a negative number of explorers in the planet, otherwise Ok
                 })
             }
-            OrchestratorToPlanet::KillPlanet => Some(PlanetToOrchestrator::KillPlanetResult {
-                planet_id: state.id(),
-            }),
+            OrchestratorToPlanet::KillPlanet => {
+                self.stop(state);
+
+                let payload=Payload::from([
+                    ("action".to_string(),"kill_ack".to_string())
+                ]);
+
+                LogEvent::new(
+                    ActorType::Planet,
+                    self.planet_id,
+                    ActorType::Orchestrator,
+                    "orchestrator".to_string(),
+                    EventType::MessageOrchestratorToPlanet,
+                    Channel::Info,
+                    payload
+                ).emit();
+
+                Some(PlanetToOrchestrator::KillPlanetResult { planet_id: state.id() })
+            },
         }
     }
 
@@ -429,36 +489,36 @@ impl PlanetAI for EnterpriseAi {
         // This function tries to take a rocket from the planet
         // If there is no rocket, it tries to build one
         // If this does not work, it returns None
-        match state.take_rocket() {
+        match state.take_rocket() {         
             Some(rocket) => { 
-            let payload = Payload::from([("defense".to_string(), "using_existing_rocket".to_string())]);
-            LogEvent::new(
-                ActorType::Planet,
-                self.planet_id,
-                ActorType::SelfActor,
-                "self".to_string(),
-                EventType::InternalPlanetAction,
-                Channel::Info,
-                payload,
-            ).emit();
-            Some(rocket) 
-        },
-            None => {
-                if let Some((_, at)) = state.full_cell() {
-                    state.build_rocket(at);
-                } else {
-                let payload = Payload::from([("warning".to_string(), "no_charged_cell_for_rocket".to_string())]);
+                let payload = Payload::from([("defense".to_string(), "using_existing_rocket".to_string())]);
                 LogEvent::new(
                     ActorType::Planet,
                     self.planet_id,
                     ActorType::SelfActor,
                     "self".to_string(),
                     EventType::InternalPlanetAction,
-                    Channel::Warning,
+                    Channel::Info,
                     payload,
                 ).emit();
-            }// Unused result for logging?
-                state.take_rocket()
+                Some(rocket) 
+                },
+                None => {
+                    if let Some((_, at)) = state.full_cell() {
+                        state.build_rocket(at);
+                    } else {
+                        let payload = Payload::from([("warning".to_string(), "no_charged_cell_for_rocket".to_string())]);
+                        LogEvent::new(
+                            ActorType::Planet,
+                            self.planet_id,
+                            ActorType::SelfActor,
+                            "self".to_string(),
+                            EventType::InternalPlanetAction,
+                            Channel::Warning,
+                            payload,
+                        ).emit();
+                    }// Unused result for logging?
+                    state.take_rocket()
             }
         }
     }
@@ -485,7 +545,7 @@ impl PlanetAI for EnterpriseAi {
             Channel::Warning,
             payload,
         ).emit();
-        return None;
+        return Some(PlanetToExplorer::Stopped);     // from the documentation "This variant is used by planets that are currently in a stopped state to acknowledge any message coming from an explorer"
     }
 
         match msg {
@@ -495,6 +555,22 @@ impl PlanetAI for EnterpriseAi {
                     .cells_iter()
                     .filter(|energy_cell| energy_cell.is_charged())
                     .count() as u32; // i know we need only to check if the first is charged - Ok, that is more complete
+                
+                let payload = Payload::from([
+                    ("request".to_string(), "available_energy_cells".to_string()),
+                    ("count".to_string(), available.to_string()),
+                ]);
+                
+                LogEvent::new(
+                    ActorType::Explorer,
+                    explorer_id,
+                    ActorType::Planet,
+                    self.planet_id.to_string(),
+                    EventType::MessageExplorerToPlanet,
+                    Channel::Info,
+                    payload,
+                ).emit();
+                
                 Some(PlanetToExplorer::AvailableEnergyCellResponse {
                     available_cells: available,
                 })
@@ -512,12 +588,46 @@ impl PlanetAI for EnterpriseAi {
             }),
             ExplorerToPlanet::SupportedCombinationRequest { .. } => {
                 // C-type planets support unbounded combination rules (up to 6)
+                // let count = combinator.all_available_recipes().len();
+                let payload = Payload::from([
+                    ("request".to_string(), "supported_combinations".to_string()),
+                    ("count".to_string(), combinator.all_available_recipes().len().to_string()),
+                ]);
+                
+                LogEvent::new(
+                    ActorType::Explorer,
+                    explorer_id,
+                    ActorType::Planet,
+                    self.planet_id.to_string(),
+                    EventType::MessageExplorerToPlanet,
+                    Channel::Info,
+                    payload,
+                ).emit();
                 Some(PlanetToExplorer::SupportedCombinationResponse {
                     combination_list: combinator.all_available_recipes(),
                 })
             }
             ExplorerToPlanet::SupportedResourceRequest { .. } => {
                 // C-type planets support only one generation rule
+
+                let resources=generator.all_available_recipes();
+                let resources_list=resources.iter().map(|r| format!("{:?}",r)).collect::<Vec<String>>();
+
+                let payload=Payload::from([
+                    ("request".to_string(),"supported_resources".to_string()),
+                    ("resources".to_string(),resources_list.join(", "))
+                ]);
+
+                LogEvent::new(
+                    ActorType::Explorer,
+                    explorer_id,
+                    ActorType::Planet,
+                    self.planet_id.to_string(),
+                    EventType::MessageExplorerToPlanet,
+                    Channel::Info,
+                    payload
+                ).emit();
+
                 Some(PlanetToExplorer::SupportedResourceResponse {
                     resource_list: generator.all_available_recipes(),
                 })
