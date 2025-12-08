@@ -23,7 +23,7 @@ pub struct EnterpriseAi {
 }
 
 impl PlanetAI for EnterpriseAi {
-    fn start(&mut self, state: &PlanetState) {
+    fn start(&mut self, _state: &PlanetState) {
         self.running = true; // Flags the parameter to true, the planet is active
         self.num_explorers = 0; // There are no explorers when the planet is created
 
@@ -44,7 +44,7 @@ impl PlanetAI for EnterpriseAi {
         .emit();
     }
 
-    fn stop(&mut self, state: &PlanetState) {
+    fn stop(&mut self, _state: &PlanetState) {
         self.running = false; // Flags the parameter to false, the planet is stopped
         self.num_explorers = 0; // The number of explorers is brought to zero
 
@@ -378,11 +378,10 @@ impl PlanetAI for EnterpriseAi {
 
                 Some(PlanetToOrchestrator::IncomingExplorerResponse {
                     planet_id: state.id(),
-                    res: Ok(()), // This is a Result<(), String>, I didn't understand in which cases an explorer wouldn't be accepted
+                    res: Ok(()),
                 })
             }
             OrchestratorToPlanet::OutgoingExplorerRequest { explorer_id } => {
-                // not called
                 let mut res = Ok(());
                 if self.num_explorers > 0 {
                     self.num_explorers -= 1; // The number of explorers inside the planet is decreased, the explorer is leaving
@@ -782,24 +781,7 @@ impl EnterpriseAi {
     None
     }
 
-            // Do we need to match the request?
-            // Because if generator contains request, we know it is carbon.
-            // Or should we keep the version with the match for extra safety?
 
-            // if let Some((energy_cell, _)) = state.full_cell() {
-            //     let new_resource = match request {
-            //         BasicResourceType::Carbon => generator
-            //             .make_carbon(energy_cell)
-            //             .map(|new_carbon| BasicResource::Carbon(new_carbon)),
-            //         _ => Err("Resource not supported".to_string()), // need this for compiler to shut up
-            //     };
-            //
-            //
-            //     match new_resource {
-            //         Ok(new_resource) => {return Some(new_resource)},
-            //         Err(_) => {}, //Handle error?
-            //     }
-            // }
     
 
     fn handle_combine_request(
@@ -852,17 +834,6 @@ impl EnterpriseAi {
         }
     }
 
-        //Add logging?
-
-        // I didn't manage to find a way to do the energy cell check outside because of r1 and r2
-        // Maybe a function would be better?
-
-        // let energy_cell = match state.full_cell() {
-        //     Some((c, _)) => c,
-        //     None => { return Err("No energy cell available".to_string(), r1, r2)},
-        // };
-
-        // This became quite big... Maybe there is a better way to do it
 
         match request {
             // The "AIPartner" complex resource takes Robot + Diamond
@@ -1322,394 +1293,578 @@ pub fn create_planet(
     }
 }
 }
-// #[cfg(test)]
-// mod tests {
-// use common_game::{
-//     components::{
-//         asteroid::Asteroid,
-//         energy_cell::EnergyCell,
-//         planet::{Planet, PlanetAI, PlanetState, PlanetType},
-//         resource::*,
-//         rocket::Rocket,
-//         sunray::Sunray,
-//     },
-//     protocols::messages::{
-//         ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
-//     },
-// };
-// use super::*;
-// use std::sync::mpsc::{Receiver, Sender, channel};
-// //use crossbeam_channel::channel;
 
-// #[test]
-//     fn is_one_equal_to_one() {
-//         assert_eq!(1, 1)
-//     }
+//Start of tests
 
-// #[test]
-//     fn test_ai_initial_state_should_not_be_running() {
-//         let ai = EnterpriseAi::new(67);
-//         assert!(!ai.is_running());
-//     }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use common_game::{
+        components::{
+            asteroid::Asteroid,
+            energy_cell::EnergyCell,
+            planet::{DummyPlanetState, Planet, PlanetAI, PlanetState, PlanetType},
+            resource::*,
+            rocket::Rocket,
+            sunray::Sunray,
+        },
+        protocols::messages::{
+            ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
+        },
+    };
+    use crossbeam_channel::{Receiver, Sender, unbounded};
+    use std::time::Duration;
+    use std::thread;
 
-//     fn create_dummy_state() -> PlanetState {
-//         PlanetState {
-//             id: 67,
-//             energy_cells: vec![EnergyCell::new()],
-//             rocket: None,
-//             can_have_rocket: true,
-//         }
-//     }
-//     fn create_state_with_charged_cell() -> PlanetState {
-//        let mut state = create_dummy_state();
-//        state.cell_mut(0).charge(Sunray::new());
-//        state
-//    }
-//     fn create_state_with_rocket() -> PlanetState {
-//         let mut state = create_state_with_charged_cell();
-//         let _ = state.build_rocket(0);
-//         state
-//     }
-// #[test]
-//     fn ai_should_start_n_stop() {
-//         let mut ai = EnterpriseAi::new(67);
-//         let dummy_state = create_dummy_state();
+    fn create_dummy_planet() -> Planet {
+        let (tx_orchestrator, rx_orchestrator) = unbounded::<OrchestratorToPlanet>();
+        let (tx_to_orchestrator, _) = unbounded::<PlanetToOrchestrator>();
+        let (_, rx_explorer) = unbounded::<ExplorerToPlanet>();
 
-//         ai.start(&dummy_state);
-//         assert!(ai.is_running());
+        let dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orchestrator, tx_to_orchestrator, rx_explorer); // Creating the planet
 
-//         ai.stop(&dummy_state);
-//         assert!(!ai.is_running());
-//     }
-// #[test]
-//     fn planet_creation() {
-//         let (tx_orchestrator, rx_orchestrator) = channel::<OrchestratorToPlanet>();
-//         let (tx_to_orchestrator, _) = channel::<PlanetToOrchestrator>();
-//         let (_, rx_explorer) = channel::<ExplorerToPlanet>();
+        dummy_planet
+    }
 
-//         let planet = create_planet(67, rx_orchestrator, tx_orchestrator, rx_explorer);
+    #[test]
+    fn ai_initial_state_should_not_be_running() {
+        let ai = EnterpriseAi::new(67);
+        assert!(!ai.is_running());
+    }
 
-//         assert_eq!(planet.id(), 67);
+    #[test]
+    fn planet_creation_should_be_correct() {
+        let dummy_planet = create_dummy_planet(); // Creating the planet
+        assert_eq!(dummy_planet.id(), 67); // Checking if the id is correct
 
-//         let state = planet.state();
-//         assert_eq!(state.cells_count(), 1);
-//         assert!(!state.has_rocket());
-//         assert!(state.can_have_rocket());
-//     }
-// #[test]
-//     fn sunray_charging() {
-//         let mut ai = EnterpriseAi::new(67);
-//         let mut state = create_dummy_state();
-//         let generator = Generator::new();
-//         let combinator = Combinator::new();
+        let state = dummy_planet.state();
+        assert_eq!(state.cells_count(), 1); // Checking if the number of cells is correct (1 is the max for C-type planet)
+        assert!(!state.has_rocket()); // The initial planet state shouldn't have a built rocket
+        assert!(state.can_have_rocket()); // C-type planets can have a rocket
+    }
 
-//         ai.start(&state);
+    #[test]
+    fn ai_should_start_n_stop() {
+        let mut ai = EnterpriseAi::new(67); // Creating the AI
+        let dummy_planet = create_dummy_planet(); // Creating the planet
 
-//         let sunray_msg = OrchestratorToPlanet::Sunray(Sunray::new());
-//         let response = ai.handle_orchestrator_msg(
-//             &mut state,
-//             &generator,
-//             &combinator,
-//             sunray_msg,
-//         );
+        ai.start(&dummy_planet.state()); // Starting the AI
+        assert!(ai.is_running()); // Checking if its running
+        assert!(ai.num_explorers == 0); //Checking if there are no explorers when the AI has just started running
 
-//         assert!(response.is_some());
-//         assert!(state.cell(0).is_charged());
-//     }
-// #[test]
-//     fn asteroid_defensed_by_rocket() {
-//         let mut ai = EnterpriseAi::new(67);
-//         let mut state = create_state_with_rocket();
-//         let generator = Generator::new();
-//         let combinator = Combinator::new();
-//         ai.start(&state);
-//         let asteroid_msg = OrchestratorToPlanet::Asteroid(Asteroid::new());
-//         let response = ai.handle_orchestrator_msg(
-//             &mut state,
-//             &generator,
-//             &combinator,
-//             asteroid_msg,
-//         );
+        ai.stop(&dummy_planet.state()); // Stopping the AI
+        assert!(!ai.is_running()); // Checking if its stopped
+        assert!(ai.num_explorers == 0); //Checking if there are no explorers in the planet anymore
+    }
 
-//     assert!(response.is_some());
-// }
-// #[test]
-//     fn sunray_message() {
-//         let mut ai = EnterpriseAi::new(67);
-//         let mut state = create_dummy_state();
-//         let generator = Generator::new();
-//         let combinator = Combinator::new();
+    #[test]
+    fn start_orchestrator() {
 
-//         ai.start(&state);
-//         let sunray_msg = OrchestratorToPlanet::Sunray(Sunray::new());
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (_tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
 
-//         let response = ai.handle_orchestrator_msg(
-//             &mut state,
-//             &generator,
-//             &combinator,
-//             sunray_msg,
-//         );
-//         assert!(response.is_some());
-// }
-//     #[test]
-// fn asteroid_message() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_dummy_state();
-//     let generator = Generator::new();
-//     let combinator = Combinator::new();
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
 
-//     ai.start(&state);
 
-//     let asteroid_msg = OrchestratorToPlanet::Asteroid(Asteroid::new());
-//     let response = ai.handle_orchestrator_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         asteroid_msg,
-//     );
-//     assert!(response.is_some());
-// }
-// #[test]
-// fn resource_generation_request() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_dummy_state();
-//     let generator = Generator::new();
-//     let combinator = Combinator::new();
 
-//     ai.start(&state);
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
 
-//     let resource_msg =ExplorerToPlanet::GenerateResourceRequest {
-//         explorer_id: 1,
-//         resource: BasicResourceType::Carbon,
-//     };
+        let _handle = thread::spawn(move || {dummy_planet.run()});
 
-//     let response = ai.handle_explorer_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         resource_msg,
-//     );
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
 
-//     assert!(response.is_some());
-// }
 
-// #[test]
-// fn supported_resources_request() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_dummy_state();
-//     let generator = Generator::new();
-//     let combinator = Combinator::new();
+    }
 
-//     ai.start(&state);
+     #[test]
+      fn stop_orchestrator() {
 
-//     let request_msg = ExplorerToPlanet::SupportedResourceRequest {
-//         explorer_id: 1,
-//     };
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (_tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
 
-//     let response = ai.handle_explorer_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         request_msg,
-//     );
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
 
-//     assert!(response.is_some());
-// }
 
-// #[test]
-// fn available_energy_cells_request() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_dummy_state();
-//     let generator = Generator::new();
-//     let combinator = Combinator::new();
 
-//     ai.start(&state);
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let stop_msg = OrchestratorToPlanet::StopPlanetAI;
 
-//     let request_msg = messages::ExplorerToPlanet::AvailableEnergyCellRequest {
-//         explorer_id: 1,
-//     };
+        let _handle = thread::spawn(move || {dummy_planet.run()});
 
-//     let response = ai.handle_explorer_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         request_msg,
-//     );
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
 
-//     assert!(response.is_some());
+        tx_orch_in
+            .send(stop_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StopPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
 
-//     match response.unwrap() {
-//         PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
-//             assert_eq!(available_cells, 0);
-//         }
-//         _ => panic!("Need AvailableEnergyCellResponse"),
-//     }
-// }
 
-// #[test]
-// fn incoming_explorer_request() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_dummy_state();
-//     let generator = Generator::new();
-//     let combinator = Combinator::new();
 
-//     ai.start(&state);
+    }
 
-//     let (tx_explorer, _) = channel::<messages::PlanetToExplorer>();
-//     let incoming_msg = OrchestratorToPlanet::IncomingExplorerRequest {
-//         explorer_id: 1,
-//         new_mpsc_sender: tx_explorer,
-//     };
+    #[test]
+    fn sunray_orchestrator() {
 
-//     let response = ai.handle_orchestrator_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         incoming_msg,
-//     );
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (_tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
 
-//     assert!(response.is_some());
-// }
-// #[test]
-// fn outgoing_explorer_request() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_dummy_state();
-//     let generator = Generator::new();
-//     let combinator = Combinator::new();
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
 
-//     ai.start(&state);
 
-//     let outgoing_msg = OrchestratorToPlanet::OutgoingExplorerRequest {
-//         explorer_id: 1,
-//     };
 
-//     let response = ai.handle_orchestrator_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         outgoing_msg,
-//     );
-//     assert!(response.is_some());
-// }
-// #[test]
-// fn complex_resource_combination() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_state_with_charged_cell();
-//     let generator = Generator::new();
-//     let mut combinator = Combinator::new();
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let sunray_msg = OrchestratorToPlanet::Sunray(Sunray::default());
 
-//     combinator.add(ComplexResourceType::Water).unwrap();
-//     combinator.add(ComplexResourceType::Diamond).unwrap();
-//     ai.start(&state);
+        let _handle = thread::spawn(move || {dummy_planet.run()});
 
-//     let request_msg = ExplorerToPlanet::SupportedCombinationRequest {
-//         explorer_id: 1,
-//     };
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
 
-//     let response = ai.handle_explorer_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         request_msg,
-//     );
+        tx_orch_in
+            .send(sunray_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::SunrayAck { planet_id: 67 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
 
-//     assert!(response.is_some());
-//     match response.unwrap() {
-//         PlanetToExplorer::SupportedCombinationResponse { combination_list } => {
-//             assert_eq!(combination_list.len(), 2);
-//         }
-//         _ => panic!("Need SupportedCombinationResponse"),
-//     }
-// }
-// #[test]
-// fn ai_stopped() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_dummy_state();
-//     let generator = Generator::new();
-//     let combinator = Combinator::new();
+    #[test]
+        fn asteroid_orchestrator_with_sunray() {
 
-//     assert!(!ai.is_running());
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (_tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
 
-//     let sunray_msg = OrchestratorToPlanet::Sunray(Sunray::new());
-//     let response = ai.handle_orchestrator_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         sunray_msg,
-//     );
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
 
-//     assert!(response.is_none());
 
-//     let start_msg = OrchestratorToPlanet::StartPlanetAI;
-//     let response = ai.handle_orchestrator_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         start_msg,
-//     );
 
-//     assert!(response.is_some());
-//     assert!(ai.is_running());
-// }
-// #[test]
-// fn kill_planet() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_dummy_state();
-//     let generator = Generator::new();
-//     let combinator = Combinator::new();
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let sunray_msg = OrchestratorToPlanet::Sunray(Sunray::default());
+        let asteroid_msg = OrchestratorToPlanet::Asteroid(Asteroid::default());
 
-//     ai.start(&state);
+        let _handle = thread::spawn(move || {dummy_planet.run()});
 
-//     let kill_msg = OrchestratorToPlanet::KillPlanet;
-//     let response = ai.handle_orchestrator_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         kill_msg,
-//     );
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
 
-//     assert!(response.is_some());
-// }
-// #[test]
-// fn resource_generation_without_energy() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_dummy_state(); // now i believe there isn't energy cell in it
-//     let mut generator = Generator::new();
-//     let combinator = Combinator::new();
-//     generator.add(BasicResourceType::Carbon).unwrap();
-//     ai.start(&state);
-//     let resource_msg = ExplorerToPlanet::GenerateResourceRequest {
-//         explorer_id: 1,
-//         resource: BasicResourceType::Carbon,
-//     };
+        tx_orch_in
+            .send(sunray_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::SunrayAck { planet_id: 67 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
 
-//     let response = ai.handle_explorer_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         resource_msg,
-//     );
-//     assert!(response.is_some());
-// }
-// #[test]
-// fn unsupported_resource_request() {
-//     let mut ai = EnterpriseAi::new(67);
-//     let mut state = create_state_with_charged_cell();
-//     let generator = Generator::new();
-//     let combinator = Combinator::new();
+        tx_orch_in
+            .send(asteroid_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::AsteroidAck { planet_id:67, rocket:r }) => {assert!(true); assert!(r.is_some());}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
 
-//     ai.start(&state);
-//     let resource_msg = ExplorerToPlanet::GenerateResourceRequest {
-//         explorer_id: 1,
-//         resource: BasicResourceType::Oxygen, // it is not carbon
-//     };
+    }
 
-//     let response = ai.handle_explorer_msg(
-//         &mut state,
-//         &generator,
-//         &combinator,
-//         resource_msg,
-//     );
-//     assert!(response.is_some());
-// }
-// }
+    #[test]
+
+    fn asteroid_orchestrator_with_sunray_and_energy_cell() {
+
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (_tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
+
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
+
+
+
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let sunray_msg = OrchestratorToPlanet::Sunray(Sunray::default());
+        let asteroid_msg = OrchestratorToPlanet::Asteroid(Asteroid::default());
+
+        let _handle = thread::spawn(move || {dummy_planet.run()});
+
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(sunray_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::SunrayAck { planet_id: 67 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::Sunray(Sunray::default())).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::SunrayAck { planet_id: 67 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(asteroid_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::AsteroidAck { planet_id:67, rocket:r }) => {assert!(true); assert!(r.is_some());}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::Asteroid(Asteroid::default())).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::AsteroidAck { planet_id:67, rocket:r }) => {assert!(true); assert!(r.is_some());}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+    }
+
+    #[test]
+    fn asteroid_orchestrator_no_sunray() {
+
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (_tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
+
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
+
+
+
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let asteroid_msg = OrchestratorToPlanet::Asteroid(Asteroid::default());
+
+        let _handle = thread::spawn(move || {dummy_planet.run()});
+
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(asteroid_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::AsteroidAck { planet_id:67, rocket:r }) => {assert!(true); assert!(r.is_none());}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+    }
+
+    #[test]
+    fn internal_state_orchestrator() {
+
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (_tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
+
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
+
+
+
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let internal_msg = OrchestratorToPlanet::InternalStateRequest;
+
+        let _handle = thread::spawn(move || {dummy_planet.run()});
+
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(internal_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::InternalStateResponse { planet_id:67, planet_state: _}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+        
+
+    }
+    
+    #[test]
+    fn explorer_available_energy_zero() {
+
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
+        let (tx_expl_out, rx_expl_out) = unbounded::<PlanetToExplorer>(); 
+
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
+
+
+
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let explo_request = ExplorerToPlanet::AvailableEnergyCellRequest { explorer_id: 1 };
+
+        let _handle = thread::spawn(move || {dummy_planet.run()});
+
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::IncomingExplorerRequest {
+                explorer_id: 1,
+                new_mpsc_sender: tx_expl_out,
+            })
+            .unwrap();
+
+        tx_expl_in
+            .send(explo_request).unwrap();
+        
+        match rx_expl_out.recv_timeout(Duration::from_millis(100)) {
+            Ok(PlanetToExplorer::AvailableEnergyCellResponse { available_cells:0 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+    }
+
+    #[test]
+
+    fn explorer_available_energy_one() {
+
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
+        let (tx_expl_out, rx_expl_out) = unbounded::<PlanetToExplorer>(); 
+
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
+
+
+
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let explo_request = ExplorerToPlanet::AvailableEnergyCellRequest { explorer_id: 1 };
+
+        let _handle = thread::spawn(move || {dummy_planet.run()});
+
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::Sunray(Sunray::default())).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::SunrayAck { planet_id: 67 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::Sunray(Sunray::default())).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::SunrayAck { planet_id: 67 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::IncomingExplorerRequest {
+                explorer_id: 1,
+                new_mpsc_sender: tx_expl_out,
+            })
+            .unwrap();
+
+        tx_expl_in
+            .send(explo_request).unwrap();
+        
+        match rx_expl_out.recv_timeout(Duration::from_millis(100)) {
+            Ok(PlanetToExplorer::AvailableEnergyCellResponse { available_cells:1 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+    }
+
+    #[test]
+    fn explorer_generate_carbon() {
+
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
+        let (tx_expl_out, rx_expl_out) = unbounded::<PlanetToExplorer>(); 
+
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
+
+
+
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let explo_request = ExplorerToPlanet::GenerateResourceRequest { explorer_id: 1, resource: BasicResourceType::Carbon };
+
+        let _handle = thread::spawn(move || {dummy_planet.run()});
+
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::Sunray(Sunray::default())).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::SunrayAck { planet_id: 67 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::Sunray(Sunray::default())).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::SunrayAck { planet_id: 67 }) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::IncomingExplorerRequest {
+                explorer_id: 1,
+                new_mpsc_sender: tx_expl_out,
+            })
+            .unwrap();
+
+        tx_expl_in
+            .send(explo_request).unwrap();
+        
+        match rx_expl_out.recv_timeout(Duration::from_millis(100)) {
+            Ok(PlanetToExplorer::GenerateResourceResponse { resource:r }) => {assert!(r.is_some())}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+    }
+    #[test]
+    fn explorer_generate_carbon_no_energy() {
+
+        let (tx_orch_in, rx_orch_in) = unbounded::<OrchestratorToPlanet>();
+        let (tx_orch_out, rx_orch_out) = unbounded::<PlanetToOrchestrator>();
+        let (tx_expl_in, rx_expl_in) = unbounded::<ExplorerToPlanet>();
+        let (tx_expl_out, rx_expl_out) = unbounded::<PlanetToExplorer>(); 
+
+        let mut dummy_planet =
+            EnterpriseAi::create_planet(67, rx_orch_in, tx_orch_out, rx_expl_in); // Creating the planet
+
+
+
+        let start_msg = OrchestratorToPlanet::StartPlanetAI;
+        let explo_request = ExplorerToPlanet::GenerateResourceRequest { explorer_id: 1, resource: BasicResourceType::Carbon };
+
+        let _handle = thread::spawn(move || {dummy_planet.run()});
+
+        tx_orch_in
+            .send(start_msg).unwrap();
+        
+        match rx_orch_out.recv_timeout(Duration::from_millis(50)) {
+            Ok(PlanetToOrchestrator::StartPlanetAIResult {planet_id :67}) => {assert!(true)}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+
+        tx_orch_in
+            .send(OrchestratorToPlanet::IncomingExplorerRequest {
+                explorer_id: 1,
+                new_mpsc_sender: tx_expl_out,
+            })
+            .unwrap();
+
+        tx_expl_in
+            .send(explo_request).unwrap();
+        
+        match rx_expl_out.recv_timeout(Duration::from_millis(100)) {
+            Ok(PlanetToExplorer::GenerateResourceResponse { resource:r }) => {assert!(r.is_none())}
+            _ => assert!(false),
+        }
+        thread::sleep(Duration::from_millis(50));
+
+    }
+
+}   
+
