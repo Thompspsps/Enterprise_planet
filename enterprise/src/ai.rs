@@ -69,6 +69,29 @@ impl PlanetAI for EnterpriseAi {
         combinator: &Combinator,
         msg: OrchestratorToPlanet,
     ) -> Option<PlanetToOrchestrator> {
+        let msg_type = match &msg {
+        OrchestratorToPlanet::Sunray(_) => "Sunray",
+        OrchestratorToPlanet::Asteroid(_) => "Asteroid",
+        OrchestratorToPlanet::StartPlanetAI => "StartPlanetAI",
+        OrchestratorToPlanet::StopPlanetAI => "StopPlanetAI",
+        OrchestratorToPlanet::KillPlanet => "KillPlanet",
+        OrchestratorToPlanet::InternalStateRequest => "InternalStateRequest",
+        OrchestratorToPlanet::IncomingExplorerRequest { .. } => "IncomingExplorerRequest",
+        OrchestratorToPlanet::OutgoingExplorerRequest { .. } => "OutgoingExplorerRequest",
+    };
+    
+    let incoming_payload = Payload::from([
+        ("message_type".to_string(), msg_type.to_string()),
+    ]);
+    LogEvent::new(
+        ActorType::Orchestrator,
+        LogEvent::id_from_str("orchestrator"),
+        ActorType::Planet,
+        self.planet_id.to_string(),
+        EventType::MessageOrchestratorToPlanet,
+        Channel::Info,
+        incoming_payload
+    ).emit();
         
         if !self.is_running() && !matches!(msg, OrchestratorToPlanet::StartPlanetAI) {
             // Matches returns whether the given expression matches the provided pattern
@@ -471,6 +494,21 @@ impl PlanetAI for EnterpriseAi {
         generator: &Generator,
         combinator: &Combinator,
     ) -> Option<Rocket> {
+        let start_payload = Payload::from([
+        ("action".to_string(), "handle_asteroid_start".to_string()),
+        ("has_rocket".to_string(), state.has_rocket().to_string()),
+        ("has_charged_cell".to_string(), state.full_cell().is_some().to_string()),
+    ]);
+    LogEvent::new(
+        ActorType::Planet,
+        self.planet_id,
+        ActorType::SelfActor,
+        "self".to_string(),
+        EventType::InternalPlanetAction,
+        Channel::Debug,
+        start_payload,
+    ).emit();
+        
         if !self.is_running() { 
         let payload = Payload::from([("error".to_string(), "ai_not_running".to_string())]);
         LogEvent::new(
@@ -529,7 +567,29 @@ impl PlanetAI for EnterpriseAi {
         combinator: &Combinator,
         msg: ExplorerToPlanet,
     ) -> Option<PlanetToExplorer> {
-         let explorer_id = msg.explorer_id();
+        let explorer_id = msg.explorer_id();
+        let msg_type = match &msg {
+        ExplorerToPlanet::SupportedResourceRequest { .. } => "SupportedResourceRequest",
+        ExplorerToPlanet::SupportedCombinationRequest { .. } => "SupportedCombinationRequest",
+        ExplorerToPlanet::GenerateResourceRequest { .. } => "GenerateResourceRequest",
+        ExplorerToPlanet::CombineResourceRequest { .. } => "CombineResourceRequest",
+        ExplorerToPlanet::AvailableEnergyCellRequest { .. } => "AvailableEnergyCellRequest",
+    };
+    
+    let incoming_payload = Payload::from([
+        ("message_type".to_string(), msg_type.to_string()),
+        ("explorer_id".to_string(), explorer_id.to_string()),
+    ]);
+    LogEvent::new(
+        ActorType::Explorer,
+        explorer_id,
+        ActorType::Planet,
+        self.planet_id.to_string(),
+        EventType::MessageExplorerToPlanet,
+        Channel::Info,
+        incoming_payload
+    ).emit();
+        
          if !self.is_running() {
          let payload = Payload::from([
             ("error".to_string(), "ai_not_running".to_string()),
