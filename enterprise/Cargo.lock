@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "common-game"
 version = "2.0.0"
-source = "git+https://github.com/unitn-ap-2025/common.git#cc1f15f327e1db5acf908026c458ba83949d0907"
+source = "git+https://github.com/unitn-ap-2025/common.git#60fd30803e2e7fc54ff287074ba774667a6e3133"
 dependencies = [
  "crossbeam-channel",
  "enum-as-inner",

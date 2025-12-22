@@ -6,6 +6,7 @@ use common_game::components::resource::*;
 use common_game::components::resource::{Combinator, Generator};
 use common_game::components::rocket::Rocket;
 use common_game::components::sunray::Sunray;
+use common_game::logging::*;
 use common_game::protocols::orchestrator_planet::*;
 use common_game::protocols::planet_explorer::*;
 use common_game::utils::ID;
@@ -19,6 +20,8 @@ pub struct EnterpriseAi {
     num_explorers: u8, // This parameter represents how many explorers are on the planet
     planet_id: u32,    // This parameter represents the planet ID (used for logging purposes)
 }
+
+const ORCHESTRATOR: &str = "orchestrator";
 
 impl PlanetAI for EnterpriseAi {
     fn handle_sunray(
@@ -38,28 +41,32 @@ impl PlanetAI for EnterpriseAi {
 
         let had_charged_cell = self.has_charged_cells(state);
 
-        // let mut payload = Payload::from([
-        //     (
-        //         "visiting_explorers".to_string(),
-        //         self.num_explorers.to_string(),
-        //     ),
-        //     ("has_rocket".to_string(), state.has_rocket().to_string()),
-        //     (
-        //         "had_charged_cells".to_string(),
-        //         had_charged_cell.to_string(),
-        //     ),
-        // ]);
+        let mut payload = Payload::from([
+            (
+                "visiting_explorers".to_string(),
+                self.num_explorers.to_string(),
+            ),
+            ("has_rocket".to_string(), state.has_rocket().to_string()),
+            (
+                "had_charged_cells".to_string(),
+                had_charged_cell.to_string(),
+            ),
+        ]);
 
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::Orchestrator,
-        //     "orchestrator".to_string(),
-        //     EventType::MessageOrchestratorToPlanet,
-        //     Channel::Info,
-        //     Payload::from([("action".to_string(), "sunray_ack".to_string())]),
-        // )
-        // .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::Orchestrator,
+                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+            }),
+            EventType::MessageOrchestratorToPlanet,
+            Channel::Info,
+            Payload::from([("action".to_string(), "sunray_ack".to_string())]),
+        )
+        .emit();
 
         // Here the planet tries to build a rocket with a charged cell
         let mut rocket_built = false;
@@ -68,38 +75,46 @@ impl PlanetAI for EnterpriseAi {
                 match state.build_rocket(at) {
                     Ok(_) => {
                         rocket_built = true;
-                        // payload.insert(
-                        //     "has_built_rocket_with_existing_charged_cells".to_string(),
-                        //     true.to_string(),
-                        // );
+                        payload.insert(
+                            "has_built_rocket_with_existing_charged_cells".to_string(),
+                            true.to_string(),
+                        );
 
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Info,
-                        //     Payload::from([("action".to_string(), "built_rocket".to_string())]),
-                        // )
-                        // .emit();
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Info,
+                            Payload::from([("action".to_string(), "built_rocket".to_string())]),
+                        )
+                        .emit();
                     }
                     Err(e) => {
-                        // payload.insert("build_rocket_error".to_string(), e);
+                        payload.insert("build_rocket_error".to_string(), e);
 
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Warning,
-                        //     Payload::from([(
-                        //         "action".to_string(),
-                        //         "rocket_build_failed".to_string(),
-                        //     )]),
-                        // )
-                        // .emit();
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Warning,
+                            Payload::from([(
+                                "action".to_string(),
+                                "rocket_build_failed".to_string(),
+                            )]),
+                        )
+                        .emit();
                     }
                 }
             }
@@ -107,62 +122,74 @@ impl PlanetAI for EnterpriseAi {
 
         match state.charge_cell(sunray) {
             Some(_) => {
-                // payload.insert("received_sunray".to_string(), "wasted".to_string());
+                payload.insert("received_sunray".to_string(), "wasted".to_string());
 
-                // LogEvent::new(
-                //     ActorType::Planet,
-                //     self.planet_id,
-                //     ActorType::SelfActor,
-                //     "self".to_string(),
-                //     EventType::InternalPlanetAction,
-                //     Channel::Debug,
-                //     Payload::from([("action".to_string(), "sunray_wasted".to_string())]),
-                // )
-                // .emit();
+                LogEvent::new(
+                    Some(Participant {
+                        actor_type: ActorType::Planet,
+                        id: self.planet_id,
+                    }),
+                    Some(Participant {
+                        actor_type: ActorType::SelfActor,
+                        id: self.planet_id,
+                    }),
+                    EventType::InternalPlanetAction,
+                    Channel::Debug,
+                    Payload::from([("action".to_string(), "sunray_wasted".to_string())]),
+                )
+                .emit();
             }
             None => {
-                // payload.insert("received_sunray".to_string(), "used".to_string());
+                payload.insert("received_sunray".to_string(), "used".to_string());
 
-                // LogEvent::new(
-                //     ActorType::Planet,
-                //     self.planet_id,
-                //     ActorType::SelfActor,
-                //     "self".to_string(),
-                //     EventType::InternalPlanetAction,
-                //     Channel::Debug,
-                //     Payload::from([("action".to_string(), "sunray_used".to_string())]),
-                // )
-                // .emit();
+                LogEvent::new(
+                    Some(Participant {
+                        actor_type: ActorType::Planet,
+                        id: self.planet_id,
+                    }),
+                    Some(Participant {
+                        actor_type: ActorType::SelfActor,
+                        id: self.planet_id,
+                    }),
+                    EventType::InternalPlanetAction,
+                    Channel::Debug,
+                    Payload::from([("action".to_string(), "sunray_used".to_string())]),
+                )
+                .emit();
 
                 if self.num_explorers == 0 && !state.has_rocket() {
                     if let Some((_, at)) = state.full_cell() {
                         match state.build_rocket(at) {
                             Ok(_) => {
                                 rocket_built = true;
-                                // payload.insert(
-                                //     "has_built_rocket_with_new_energy_cell".to_string(),
-                                //     true.to_string(),
-                                // );
+                                payload.insert(
+                                    "has_built_rocket_with_new_energy_cell".to_string(),
+                                    true.to_string(),
+                                );
 
-                                // LogEvent::new(
-                                //     ActorType::Planet,
-                                //     self.planet_id,
-                                //     ActorType::SelfActor,
-                                //     "self".to_string(),
-                                //     EventType::InternalPlanetAction,
-                                //     Channel::Warning,
-                                //     Payload::from([(
-                                //         "action".to_string(),
-                                //         "has_built_rocket_with_new_energy_cell".to_string(),
-                                //     )]),
-                                // )
-                                // .emit();
+                                LogEvent::new(
+                                    Some(Participant {
+                                        actor_type: ActorType::Planet,
+                                        id: self.planet_id,
+                                    }),
+                                    Some(Participant {
+                                        actor_type: ActorType::SelfActor,
+                                        id: self.planet_id,
+                                    }),
+                                    EventType::InternalPlanetAction,
+                                    Channel::Warning,
+                                    Payload::from([(
+                                        "action".to_string(),
+                                        "has_built_rocket_with_new_energy_cell".to_string(),
+                                    )]),
+                                )
+                                .emit();
                             }
                             Err(e) => {
-                                // payload.insert(
-                                //     "has_built_rocket_with_new_energy_cell".to_string(),
-                                //     false.to_string(),
-                                // );
+                                payload.insert(
+                                    "has_built_rocket_with_new_energy_cell".to_string(),
+                                    false.to_string(),
+                                );
                             }
                         }
                     }
@@ -170,26 +197,30 @@ impl PlanetAI for EnterpriseAi {
             }
         }
 
-        // payload.insert(
-        //     "final_has_rocket".to_string(),
-        //     state.has_rocket().to_string(),
-        // );
-        // payload.insert(
-        //     "has_charged_cells".to_string(),
-        //     self.has_charged_cells(state).to_string(),
-        // );
-        // payload.insert("rocket_build".to_string(), rocket_built.to_string());
+        payload.insert(
+            "final_has_rocket".to_string(),
+            state.has_rocket().to_string(),
+        );
+        payload.insert(
+            "has_charged_cells".to_string(),
+            self.has_charged_cells(state).to_string(),
+        );
+        payload.insert("rocket_build".to_string(), rocket_built.to_string());
 
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::SelfActor,
-        //     "self".to_string(),
-        //     EventType::InternalPlanetAction,
-        //     Channel::Debug,
-        //     payload,
-        // )
-        // .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::SelfActor,
+                id: self.planet_id,
+            }),
+            EventType::InternalPlanetAction,
+            Channel::Debug,
+            payload,
+        )
+        .emit();
     }
 
     fn handle_internal_state_req(
@@ -198,18 +229,22 @@ impl PlanetAI for EnterpriseAi {
         generator: &Generator,
         combinator: &Combinator,
     ) -> DummyPlanetState {
-        // let payload = Payload::from([("request".to_string(), "internal_state".to_string())]);
+        let payload = Payload::from([("request".to_string(), "internal_state".to_string())]);
 
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::Orchestrator,
-        //     "orchestrator".to_string(),
-        //     EventType::MessageOrchestratorToPlanet,
-        //     Channel::Info,
-        //     payload,
-        // )
-        // .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::Orchestrator,
+                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+            }),
+            EventType::MessageOrchestratorToPlanet,
+            Channel::Info,
+            payload,
+        )
+        .emit();
 
         state.to_dummy()
     }
@@ -220,37 +255,45 @@ impl PlanetAI for EnterpriseAi {
         generator: &Generator,
         combinator: &Combinator,
     ) -> Option<Rocket> {
-        // let start_payload = Payload::from([
-        //     ("action".to_string(), "handle_asteroid_start".to_string()),
-        //     ("has_rocket".to_string(), state.has_rocket().to_string()),
-        //     (
-        //         "has_charged_cell".to_string(),
-        //         state.full_cell().is_some().to_string(),
-        //     ),
-        // ]);
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::SelfActor,
-        //     "self".to_string(),
-        //     EventType::InternalPlanetAction,
-        //     Channel::Debug,
-        //     start_payload,
-        // )
-        // .emit();
+        let start_payload = Payload::from([
+            ("action".to_string(), "handle_asteroid_start".to_string()),
+            ("has_rocket".to_string(), state.has_rocket().to_string()),
+            (
+                "has_charged_cell".to_string(),
+                state.full_cell().is_some().to_string(),
+            ),
+        ]);
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::SelfActor,
+                id: self.planet_id,
+            }),
+            EventType::InternalPlanetAction,
+            Channel::Debug,
+            start_payload,
+        )
+        .emit();
 
         if !self.is_running() {
-            // let payload = Payload::from([("error".to_string(), "ai_not_running".to_string())]);
-            // LogEvent::new(
-            //     ActorType::Planet,
-            //     self.planet_id,
-            //     ActorType::SelfActor,
-            //     "self".to_string(),
-            //     EventType::InternalPlanetAction,
-            //     Channel::Warning,
-            //     payload,
-            // )
-            // .emit();
+            let payload = Payload::from([("error".to_string(), "ai_not_running".to_string())]);
+            LogEvent::new(
+                Some(Participant {
+                    actor_type: ActorType::Planet,
+                    id: self.planet_id,
+                }),
+                Some(Participant {
+                    actor_type: ActorType::SelfActor,
+                    id: self.planet_id,
+                }),
+                EventType::InternalPlanetAction,
+                Channel::Warning,
+                payload,
+            )
+            .emit();
             return None;
         }
 
@@ -259,38 +302,46 @@ impl PlanetAI for EnterpriseAi {
         // If this does not work, it returns None
         match state.take_rocket() {
             Some(rocket) => {
-                // let payload =
-                //     Payload::from([("defense".to_string(), "using_existing_rocket".to_string())]);
-                // LogEvent::new(
-                //     ActorType::Planet,
-                //     self.planet_id,
-                //     ActorType::SelfActor,
-                //     "self".to_string(),
-                //     EventType::InternalPlanetAction,
-                //     Channel::Info,
-                //     payload,
-                // )
-                // .emit();
+                let payload =
+                    Payload::from([("defense".to_string(), "using_existing_rocket".to_string())]);
+                LogEvent::new(
+                    Some(Participant {
+                        actor_type: ActorType::Planet,
+                        id: self.planet_id,
+                    }),
+                    Some(Participant {
+                        actor_type: ActorType::SelfActor,
+                        id: self.planet_id,
+                    }),
+                    EventType::InternalPlanetAction,
+                    Channel::Info,
+                    payload,
+                )
+                .emit();
                 Some(rocket)
             }
             None => {
                 if let Some((_, at)) = state.full_cell() {
                     state.build_rocket(at);
                 } else {
-                    //     let payload = Payload::from([(
-                    //         "warning".to_string(),
-                    //         "no_charged_cell_for_rocket".to_string(),
-                    //     )]);
-                    //     LogEvent::new(
-                    //         ActorType::Planet,
-                    //         self.planet_id,
-                    //         ActorType::SelfActor,
-                    //         "self".to_string(),
-                    //         EventType::InternalPlanetAction,
-                    //         Channel::Warning,
-                    //         payload,
-                    //     )
-                    //     .emit();
+                    let payload = Payload::from([(
+                        "warning".to_string(),
+                        "no_charged_cell_for_rocket".to_string(),
+                    )]);
+                    LogEvent::new(
+                        Some(Participant {
+                            actor_type: ActorType::Planet,
+                            id: self.planet_id,
+                        }),
+                        Some(Participant {
+                            actor_type: ActorType::SelfActor,
+                            id: self.planet_id,
+                        }),
+                        EventType::InternalPlanetAction,
+                        Channel::Warning,
+                        payload,
+                    )
+                    .emit();
                 }
                 state.take_rocket()
             }
@@ -313,36 +364,44 @@ impl PlanetAI for EnterpriseAi {
             ExplorerToPlanet::AvailableEnergyCellRequest { .. } => "AvailableEnergyCellRequest",
         };
 
-        // let incoming_payload = Payload::from([
-        //     ("message_type".to_string(), msg_type.to_string()),
-        //     ("explorer_id".to_string(), explorer_id.to_string()),
-        // ]);
-        // LogEvent::new(
-        //     ActorType::Explorer,
-        //     explorer_id,
-        //     ActorType::Planet,
-        //     self.planet_id.to_string(),
-        //     EventType::MessageExplorerToPlanet,
-        //     Channel::Info,
-        //     incoming_payload,
-        // )
-        // .emit();
+        let incoming_payload = Payload::from([
+            ("message_type".to_string(), msg_type.to_string()),
+            ("explorer_id".to_string(), explorer_id.to_string()),
+        ]);
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Explorer,
+                id: explorer_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            EventType::MessageExplorerToPlanet,
+            Channel::Info,
+            incoming_payload,
+        )
+        .emit();
 
         if !self.is_running() {
-            // let payload = Payload::from([
-            //     ("error".to_string(), "ai_not_running".to_string()),
-            //     ("explorer_id".to_string(), explorer_id.to_string()),
-            // ]);
-            // LogEvent::new(
-            //     ActorType::Planet,
-            //     self.planet_id,
-            //     ActorType::Explorer,
-            //     explorer_id.to_string(),
-            //     EventType::MessageExplorerToPlanet,
-            //     Channel::Warning,
-            //     payload,
-            // )
-            // .emit();
+            let payload = Payload::from([
+                ("error".to_string(), "ai_not_running".to_string()),
+                ("explorer_id".to_string(), explorer_id.to_string()),
+            ]);
+            LogEvent::new(
+                Some(Participant {
+                    actor_type: ActorType::Planet,
+                    id: self.planet_id,
+                }),
+                Some(Participant {
+                    actor_type: ActorType::Explorer,
+                    id: explorer_id,
+                }),
+                EventType::MessageExplorerToPlanet,
+                Channel::Warning,
+                payload,
+            )
+            .emit();
             return Some(PlanetToExplorer::Stopped); // from the documentation "This variant is used by planets that are currently in a stopped state to acknowledge any message coming from an explorer"
         }
 
@@ -354,21 +413,25 @@ impl PlanetAI for EnterpriseAi {
                     .filter(|energy_cell| energy_cell.is_charged())
                     .count() as u32; // i know we need only to check if the first is charged - Ok, that is more complete
 
-                // let payload = Payload::from([
-                //     ("request".to_string(), "available_energy_cells".to_string()),
-                //     ("count".to_string(), available.to_string()),
-                // ]);
+                let payload = Payload::from([
+                    ("request".to_string(), "available_energy_cells".to_string()),
+                    ("count".to_string(), available.to_string()),
+                ]);
 
-                // LogEvent::new(
-                //     ActorType::Explorer,
-                //     explorer_id,
-                //     ActorType::Planet,
-                //     self.planet_id.to_string(),
-                //     EventType::MessageExplorerToPlanet,
-                //     Channel::Info,
-                //     payload,
-                // )
-                // .emit();
+                LogEvent::new(
+                    Some(Participant {
+                        actor_type: ActorType::Explorer,
+                        id: explorer_id,
+                    }),
+                    Some(Participant {
+                        actor_type: ActorType::Planet,
+                        id: self.planet_id,
+                    }),
+                    EventType::MessageExplorerToPlanet,
+                    Channel::Info,
+                    payload,
+                )
+                .emit();
 
                 Some(PlanetToExplorer::AvailableEnergyCellResponse {
                     available_cells: available,
@@ -387,24 +450,28 @@ impl PlanetAI for EnterpriseAi {
             }),
             ExplorerToPlanet::SupportedCombinationRequest { .. } => {
                 // C-type planets support unbounded combination rules (up to 6)
-                // let count = combinator.all_available_recipes().len();
-                // let payload = Payload::from([
-                //     ("request".to_string(), "supported_combinations".to_string()),
-                //     (
-                //         "count".to_string(),
-                //         combinator.all_available_recipes().len().to_string(),
-                //     ),
-                // ]);
-                // LogEvent::new(
-                //     ActorType::Explorer,
-                //     explorer_id,
-                //     ActorType::Planet,
-                //     self.planet_id.to_string(),
-                //     EventType::MessageExplorerToPlanet,
-                //     Channel::Info,
-                //     payload,
-                // )
-                // .emit();
+                let count = combinator.all_available_recipes().len();
+                let payload = Payload::from([
+                    ("request".to_string(), "supported_combinations".to_string()),
+                    (
+                        "count".to_string(),
+                        combinator.all_available_recipes().len().to_string(),
+                    ),
+                ]);
+                LogEvent::new(
+                    Some(Participant {
+                        actor_type: ActorType::Explorer,
+                        id: explorer_id,
+                    }),
+                    Some(Participant {
+                        actor_type: ActorType::Planet,
+                        id: self.planet_id,
+                    }),
+                    EventType::MessageExplorerToPlanet,
+                    Channel::Info,
+                    payload,
+                )
+                .emit();
                 Some(PlanetToExplorer::SupportedCombinationResponse {
                     combination_list: combinator.all_available_recipes(),
                 })
@@ -418,20 +485,24 @@ impl PlanetAI for EnterpriseAi {
                     .map(|r| format!("{:?}", r))
                     .collect::<Vec<String>>();
 
-                // let payload = Payload::from([
-                //     ("request".to_string(), "supported_resources".to_string()),
-                //     ("resources".to_string(), resources_list.join(", ")),
-                // ]);
-                // LogEvent::new(
-                //     ActorType::Explorer,
-                //     explorer_id,
-                //     ActorType::Planet,
-                //     self.planet_id.to_string(),
-                //     EventType::MessageExplorerToPlanet,
-                //     Channel::Info,
-                //     payload,
-                // )
-                // .emit();
+                let payload = Payload::from([
+                    ("request".to_string(), "supported_resources".to_string()),
+                    ("resources".to_string(), resources_list.join(", ")),
+                ]);
+                LogEvent::new(
+                    Some(Participant {
+                        actor_type: ActorType::Explorer,
+                        id: explorer_id,
+                    }),
+                    Some(Participant {
+                        actor_type: ActorType::Planet,
+                        id: self.planet_id,
+                    }),
+                    EventType::MessageExplorerToPlanet,
+                    Channel::Info,
+                    payload,
+                )
+                .emit();
 
                 Some(PlanetToExplorer::SupportedResourceResponse {
                     resource_list: generator.all_available_recipes(),
@@ -449,36 +520,44 @@ impl PlanetAI for EnterpriseAi {
     ) {
         self.num_explorers += 1; // The number of explorers inside the planet is increased, the explorer is coming
 
-        // let payload = Payload::from([("action".to_string(), "explorer_arrival".to_string())]);
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::Orchestrator,
-        //     "orchestrator".to_string(),
-        //     EventType::MessageOrchestratorToPlanet,
-        //     Channel::Info,
-        //     payload,
-        // )
-        // .emit();
+        let payload = Payload::from([("action".to_string(), "explorer_arrival".to_string())]);
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::Orchestrator,
+                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+            }),
+            EventType::MessageOrchestratorToPlanet,
+            Channel::Info,
+            payload,
+        )
+        .emit();
 
-        // let payload = Payload::from([
-        //     ("in_explorer_id".to_string(), explorer_id.to_string()),
-        //     (
-        //         "visiting_explorers".to_string(),
-        //         self.num_explorers.to_string(),
-        //     ),
-        // ]);
+        let payload = Payload::from([
+            ("in_explorer_id".to_string(), explorer_id.to_string()),
+            (
+                "visiting_explorers".to_string(),
+                self.num_explorers.to_string(),
+            ),
+        ]);
 
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::SelfActor,
-        //     "self".to_string(),
-        //     EventType::InternalExplorerAction,
-        //     Channel::Debug,
-        //     payload,
-        // )
-        // .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::SelfActor,
+                id: self.planet_id,
+            }),
+            EventType::InternalExplorerAction,
+            Channel::Debug,
+            payload,
+        )
+        .emit();
     }
 
     fn on_explorer_departure(
@@ -491,112 +570,135 @@ impl PlanetAI for EnterpriseAi {
         if self.num_explorers > 0 {
             self.num_explorers -= 1; // The number of explorers inside the planet is decreased, the explorer is leaving
         } else {
-            // let payload =
-            //     Payload::from([("cause".to_string(), "no_explorer_arrived_yet".to_string())]);
+            let payload =
+                Payload::from([("cause".to_string(), "no_explorer_arrived_yet".to_string())]);
 
-            // LogEvent::new(
-            //     ActorType::Planet,
-            //     self.planet_id,
-            //     ActorType::SelfActor,
-            //     "self".to_string(),
-            //     EventType::InternalExplorerAction,
-            //     Channel::Debug,
-            //     payload,
-            // )
-            // .emit();
+            LogEvent::new(
+                Some(Participant {
+                    actor_type: ActorType::Planet,
+                    id: self.planet_id,
+                }),
+                Some(Participant {
+                    actor_type: ActorType::SelfActor,
+                    id: self.planet_id,
+                }),
+                EventType::InternalExplorerAction,
+                Channel::Debug,
+                payload,
+            )
+            .emit();
         }
 
-        // let payload =
-        //     Payload::from([("action".to_string(), "explorer_departure".to_string())]);
+        let payload = Payload::from([("action".to_string(), "explorer_departure".to_string())]);
 
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::Orchestrator,
-        //     "orchestrator".to_string(),
-        //     EventType::MessageOrchestratorToPlanet,
-        //     Channel::Info,
-        //     payload,
-        // )
-        //     .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::Orchestrator,
+                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+            }),
+            EventType::MessageOrchestratorToPlanet,
+            Channel::Info,
+            payload,
+        )
+        .emit();
 
-        // let payload = Payload::from([
-        //     ("out_explorer_id".to_string(), explorer_id.to_string()),
-        //     (
-        //         "visiting_explorers".to_string(),
-        //         self.num_explorers.to_string(),
-        //     ),
-        // ]);
+        let payload = Payload::from([
+            ("out_explorer_id".to_string(), explorer_id.to_string()),
+            (
+                "visiting_explorers".to_string(),
+                self.num_explorers.to_string(),
+            ),
+        ]);
 
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::SelfActor,
-        //     "self".to_string(),
-        //     EventType::InternalExplorerAction,
-        //     Channel::Debug,
-        //     payload,
-        // )
-        //     .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::SelfActor,
+                id: self.planet_id,
+            }),
+            EventType::InternalExplorerAction,
+            Channel::Debug,
+            payload,
+        )
+        .emit();
     }
 
     fn on_start(&mut self, _state: &PlanetState, _generator: &Generator, _combinator: &Combinator) {
         self.running = true; // Flags the parameter to true, the planet is active
         self.num_explorers = 0; // There are no explorers when the planet is created
 
-        // let payload = Payload::from([
-        //     ("action".to_string(), "started".to_string()),
-        //     ("explorer_count".to_string(), self.num_explorers.to_string()),
-        // ]);
+        let payload = Payload::from([
+            ("action".to_string(), "started".to_string()),
+            ("explorer_count".to_string(), self.num_explorers.to_string()),
+        ]);
 
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::SelfActor,
-        //     "self".to_string(),
-        //     EventType::InternalPlanetAction,
-        //     Channel::Info,
-        //     payload,
-        // )
-        // .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::SelfActor,
+                id: self.planet_id,
+            }),
+            EventType::InternalPlanetAction,
+            Channel::Info,
+            payload,
+        )
+        .emit();
     }
 
     fn on_stop(&mut self, state: &PlanetState, generator: &Generator, combinator: &Combinator) {
         self.running = false; // Flags the parameter to false, the planet is stopped
         self.num_explorers = 0; // The number of explorers is brought to zero
 
-        // let payload = Payload::from([("action".to_string(), "stopped".to_string())]);
+        let payload = Payload::from([("action".to_string(), "stopped".to_string())]);
 
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::SelfActor,
-        //     "self".to_string(),
-        //     EventType::InternalPlanetAction,
-        //     Channel::Info,
-        //     payload,
-        // )
-        // .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::SelfActor,
+                id: self.planet_id,
+            }),
+            EventType::InternalPlanetAction,
+            Channel::Info,
+            payload,
+        )
+        .emit();
     }
 }
 
 impl EnterpriseAi {
     pub fn new(planet_id: u32) -> Self {
-        // let payload = Payload::from([
-        //     ("action".to_string(), "init".to_string()),
-        //     ("planet_type".to_string(), "C".to_string()),
-        // ]);
+        let payload = Payload::from([
+            ("action".to_string(), "init".to_string()),
+            ("planet_type".to_string(), "C".to_string()),
+        ]);
 
-        // LogEvent::new(
-        //     ActorType::Orchestrator,
-        //     LogEvent::id_from_str("orchestrator"),
-        //     ActorType::Planet,
-        //     planet_id.to_string(),
-        //     EventType::InternalOrchestratorAction,
-        //     Channel::Info,
-        //     payload,
-        // )
-        // .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Orchestrator,
+                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+            }),
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: planet_id,
+            }),
+            EventType::InternalOrchestratorAction,
+            Channel::Info,
+            payload,
+        )
+        .emit();
 
         Self {
             running: false,
@@ -605,18 +707,22 @@ impl EnterpriseAi {
         }
     }
     pub fn is_running(&self) -> bool {
-        // let payload = Payload::from([("is_running".to_string(), self.running.to_string())]);
+        let payload = Payload::from([("is_running".to_string(), self.running.to_string())]);
 
-        // LogEvent::new(
-        //     ActorType::Planet,
-        //     self.planet_id,
-        //     ActorType::SelfActor,
-        //     "self".to_string(),
-        //     EventType::InternalPlanetAction,
-        //     Channel::Debug,
-        //     payload,
-        // )
-        // .emit();
+        LogEvent::new(
+            Some(Participant {
+                actor_type: ActorType::Planet,
+                id: self.planet_id,
+            }),
+            Some(Participant {
+                actor_type: ActorType::SelfActor,
+                id: self.planet_id,
+            }),
+            EventType::InternalPlanetAction,
+            Channel::Debug,
+            payload,
+        )
+        .emit();
 
         self.running
     }
@@ -633,53 +739,65 @@ impl EnterpriseAi {
         state: &mut PlanetState,
     ) -> Option<BasicResource> {
         if !generator.contains(request) {
-            // let payload = Payload::from([
-            //     ("error".to_string(), "unsupported_resource".to_string()),
-            //     ("requested_resource".to_string(), format!("{:?}", request)),
-            // ]);
-            // LogEvent::new(
-            //     ActorType::Planet,
-            //     self.planet_id,
-            //     ActorType::SelfActor,
-            //     "self".to_string(),
-            //     EventType::InternalPlanetAction,
-            //     Channel::Warning,
-            //     payload,
-            // )
-            // .emit();
+            let payload = Payload::from([
+                ("error".to_string(), "unsupported_resource".to_string()),
+                ("requested_resource".to_string(), format!("{:?}", request)),
+            ]);
+            LogEvent::new(
+                Some(Participant {
+                    actor_type: ActorType::Planet,
+                    id: self.planet_id,
+                }),
+                Some(Participant {
+                    actor_type: ActorType::SelfActor,
+                    id: self.planet_id,
+                }),
+                EventType::InternalPlanetAction,
+                Channel::Warning,
+                payload,
+            )
+            .emit();
             return None;
         } else {
             let energy_cell = match state.full_cell() {
                 Some((c, i)) => {
-                    // let payload = Payload::from([
-                    //     ("action".to_string(), "using_charged_cell".to_string()),
-                    //     ("cell_index".to_string(), i.to_string()),
-                    // ]);
-                    // LogEvent::new(
-                    //     ActorType::Planet,
-                    //     self.planet_id,
-                    //     ActorType::SelfActor,
-                    //     "self".to_string(),
-                    //     EventType::InternalPlanetAction,
-                    //     Channel::Debug,
-                    //     payload,
-                    // )
-                    // .emit();
+                    let payload = Payload::from([
+                        ("action".to_string(), "using_charged_cell".to_string()),
+                        ("cell_index".to_string(), i.to_string()),
+                    ]);
+                    LogEvent::new(
+                        Some(Participant {
+                            actor_type: ActorType::Planet,
+                            id: self.planet_id,
+                        }),
+                        Some(Participant {
+                            actor_type: ActorType::SelfActor,
+                            id: self.planet_id,
+                        }),
+                        EventType::InternalPlanetAction,
+                        Channel::Debug,
+                        payload,
+                    )
+                    .emit();
                     c
                 }
                 None => {
-                    // let payload =
-                    //     Payload::from([("error".to_string(), "no_charged_cell".to_string())]);
-                    // LogEvent::new(
-                    //     ActorType::Planet,
-                    //     self.planet_id,
-                    //     ActorType::SelfActor,
-                    //     "self".to_string(),
-                    //     EventType::InternalPlanetAction,
-                    //     Channel::Warning,
-                    //     payload,
-                    // )
-                    // .emit();
+                    let payload =
+                        Payload::from([("error".to_string(), "no_charged_cell".to_string())]);
+                    LogEvent::new(
+                        Some(Participant {
+                            actor_type: ActorType::Planet,
+                            id: self.planet_id,
+                        }),
+                        Some(Participant {
+                            actor_type: ActorType::SelfActor,
+                            id: self.planet_id,
+                        }),
+                        EventType::InternalPlanetAction,
+                        Channel::Warning,
+                        payload,
+                    )
+                    .emit();
                     return None;
                 }
             };
@@ -690,37 +808,45 @@ impl EnterpriseAi {
 
             match new_resource {
                 Ok(new_resource) => {
-                    // let payload = Payload::from([
-                    //     ("action".to_string(), "resource_generated".to_string()),
-                    //     ("resource".to_string(), "Carbon".to_string()),
-                    // ]);
-                    // LogEvent::new(
-                    //     ActorType::Planet,
-                    //     self.planet_id,
-                    //     ActorType::SelfActor,
-                    //     "self".to_string(),
-                    //     EventType::InternalPlanetAction,
-                    //     Channel::Info,
-                    //     payload,
-                    // )
-                    // .emit();
+                    let payload = Payload::from([
+                        ("action".to_string(), "resource_generated".to_string()),
+                        ("resource".to_string(), "Carbon".to_string()),
+                    ]);
+                    LogEvent::new(
+                        Some(Participant {
+                            actor_type: ActorType::Planet,
+                            id: self.planet_id,
+                        }),
+                        Some(Participant {
+                            actor_type: ActorType::SelfActor,
+                            id: self.planet_id,
+                        }),
+                        EventType::InternalPlanetAction,
+                        Channel::Info,
+                        payload,
+                    )
+                    .emit();
                     return Some(new_resource);
                 }
                 Err(e) => {
-                    // let payload = Payload::from([
-                    //     ("error".to_string(), "generation_failed".to_string()),
-                    //     ("error_message".to_string(), e),
-                    // ]);
-                    // LogEvent::new(
-                    //     ActorType::Planet,
-                    //     self.planet_id,
-                    //     ActorType::SelfActor,
-                    //     "self".to_string(),
-                    //     EventType::InternalPlanetAction,
-                    //     Channel::Error,
-                    //     payload,
-                    // )
-                    // .emit();
+                    let payload = Payload::from([
+                        ("error".to_string(), "generation_failed".to_string()),
+                        ("error_message".to_string(), e),
+                    ]);
+                    LogEvent::new(
+                        Some(Participant {
+                            actor_type: ActorType::Planet,
+                            id: self.planet_id,
+                        }),
+                        Some(Participant {
+                            actor_type: ActorType::SelfActor,
+                            id: self.planet_id,
+                        }),
+                        EventType::InternalPlanetAction,
+                        Channel::Error,
+                        payload,
+                    )
+                    .emit();
                 }
             };
         }
@@ -743,40 +869,48 @@ impl EnterpriseAi {
         };
         match state.full_cell() {
             Some((c, i)) => {
-                // let cell_payload = Payload::from([
-                //     ("action".to_string(), "found_charged_cell".to_string()),
-                //     ("cell_index".to_string(), i.to_string()),
-                //     ("request_type".to_string(), request_type.to_string()),
-                // ]);
-                // LogEvent::new(
-                //     ActorType::Planet,
-                //     self.planet_id,
-                //     ActorType::SelfActor,
-                //     "self".to_string(),
-                //     EventType::InternalPlanetAction,
-                //     Channel::Debug,
-                //     cell_payload,
-                // )
-                // .emit();
+                let cell_payload = Payload::from([
+                    ("action".to_string(), "found_charged_cell".to_string()),
+                    ("cell_index".to_string(), i.to_string()),
+                    ("request_type".to_string(), request_type.to_string()),
+                ]);
+                LogEvent::new(
+                    Some(Participant {
+                        actor_type: ActorType::Planet,
+                        id: self.planet_id,
+                    }),
+                    Some(Participant {
+                        actor_type: ActorType::SelfActor,
+                        id: self.planet_id,
+                    }),
+                    EventType::InternalPlanetAction,
+                    Channel::Debug,
+                    cell_payload,
+                )
+                .emit();
             }
             None => {
-                // let no_cell_payload = Payload::from([
-                //     (
-                //         "action".to_string(),
-                //         "no_charged_cell_for_combine".to_string(),
-                //     ),
-                //     ("request_type".to_string(), request_type.to_string()),
-                // ]);
-                // LogEvent::new(
-                //     ActorType::Planet,
-                //     self.planet_id,
-                //     ActorType::SelfActor,
-                //     "self".to_string(),
-                //     EventType::InternalPlanetAction,
-                //     Channel::Warning,
-                //     no_cell_payload,
-                // )
-                // .emit();
+                let no_cell_payload = Payload::from([
+                    (
+                        "action".to_string(),
+                        "no_charged_cell_for_combine".to_string(),
+                    ),
+                    ("request_type".to_string(), request_type.to_string()),
+                ]);
+                LogEvent::new(
+                    Some(Participant {
+                        actor_type: ActorType::Planet,
+                        id: self.planet_id,
+                    }),
+                    Some(Participant {
+                        actor_type: ActorType::SelfActor,
+                        id: self.planet_id,
+                    }),
+                    EventType::InternalPlanetAction,
+                    Channel::Warning,
+                    no_cell_payload,
+                )
+                .emit();
             }
         }
 
@@ -786,21 +920,25 @@ impl EnterpriseAi {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        // let error_payload = Payload::from([
-                        //     ("error".to_string(), "no_energy_cell_available".to_string()),
-                        //     ("request_type".to_string(), "AIPartner".to_string()),
-                        // ]);
+                        let error_payload = Payload::from([
+                            ("error".to_string(), "no_energy_cell_available".to_string()),
+                            ("request_type".to_string(), "AIPartner".to_string()),
+                        ]);
 
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     error_payload,
-                        // )
-                        // .emit();
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            error_payload,
+                        )
+                        .emit();
 
                         return Err((
                             "No energy cell available".to_string(),
@@ -813,40 +951,48 @@ impl EnterpriseAi {
 
                 match complex {
                     Ok(complex) => {
-                        // let success_payload = Payload::from([
-                        //     ("action".to_string(), "combine_success".to_string()),
-                        //     ("resource".to_string(), "AIPartner".to_string()),
-                        // ]);
+                        let success_payload = Payload::from([
+                            ("action".to_string(), "combine_success".to_string()),
+                            ("resource".to_string(), "AIPartner".to_string()),
+                        ]);
 
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Info,
-                        //     success_payload,
-                        // )
-                        // .emit();
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Info,
+                            success_payload,
+                        )
+                        .emit();
 
                         Ok(ComplexResource::AIPartner(complex))
                     }
                     Err((s, r1, r2)) => {
-                        // let fail_payload = Payload::from([
-                        //     ("error".to_string(), "combine_failed".to_string()),
-                        //     ("request_type".to_string(), "AIPartner".to_string()),
-                        //     ("error_message".to_string(), s.clone()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     fail_payload,
-                        // )
-                        // .emit();
+                        let fail_payload = Payload::from([
+                            ("error".to_string(), "combine_failed".to_string()),
+                            ("request_type".to_string(), "AIPartner".to_string()),
+                            ("error_message".to_string(), s.clone()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            fail_payload,
+                        )
+                        .emit();
 
                         Err((
                             s,
@@ -861,20 +1007,24 @@ impl EnterpriseAi {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        // let error_payload = Payload::from([
-                        //     ("error".to_string(), "no_energy_cell_available".to_string()),
-                        //     ("request_type".to_string(), "Diamond".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     error_payload,
-                        // )
-                        // .emit();
+                        let error_payload = Payload::from([
+                            ("error".to_string(), "no_energy_cell_available".to_string()),
+                            ("request_type".to_string(), "Diamond".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            error_payload,
+                        )
+                        .emit();
 
                         return Err((
                             "No energy cell available".to_string(),
@@ -888,39 +1038,47 @@ impl EnterpriseAi {
 
                 match complex {
                     Ok(complex) => {
-                        // let success_payload = Payload::from([
-                        //     ("action".to_string(), "combine_success".to_string()),
-                        //     ("resource".to_string(), "Diamond".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Info,
-                        //     success_payload,
-                        // )
-                        // .emit();
+                        let success_payload = Payload::from([
+                            ("action".to_string(), "combine_success".to_string()),
+                            ("resource".to_string(), "Diamond".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Info,
+                            success_payload,
+                        )
+                        .emit();
 
                         Ok(ComplexResource::Diamond(complex))
                     }
                     Err((s, r1, r2)) => {
-                        // let fail_payload = Payload::from([
-                        //     ("error".to_string(), "combine_failed".to_string()),
-                        //     ("request_type".to_string(), "Diamond".to_string()),
-                        //     ("error_message".to_string(), s.clone()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     fail_payload,
-                        // )
-                        // .emit();
+                        let fail_payload = Payload::from([
+                            ("error".to_string(), "combine_failed".to_string()),
+                            ("request_type".to_string(), "Diamond".to_string()),
+                            ("error_message".to_string(), s.clone()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            fail_payload,
+                        )
+                        .emit();
 
                         Err((
                             s,
@@ -935,20 +1093,24 @@ impl EnterpriseAi {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        // let error_payload = Payload::from([
-                        //     ("error".to_string(), "no_energy_cell_available".to_string()),
-                        //     ("request_type".to_string(), "Dolphin".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     error_payload,
-                        // )
-                        // .emit();
+                        let error_payload = Payload::from([
+                            ("error".to_string(), "no_energy_cell_available".to_string()),
+                            ("request_type".to_string(), "Dolphin".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            error_payload,
+                        )
+                        .emit();
 
                         return Err((
                             "No energy cell available".to_string(),
@@ -962,39 +1124,47 @@ impl EnterpriseAi {
 
                 match complex {
                     Ok(complex) => {
-                        // let success_payload = Payload::from([
-                        //     ("action".to_string(), "combine_success".to_string()),
-                        //     ("resource".to_string(), "Dolphin".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Info,
-                        //     success_payload,
-                        // )
-                        // .emit();
+                        let success_payload = Payload::from([
+                            ("action".to_string(), "combine_success".to_string()),
+                            ("resource".to_string(), "Dolphin".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Info,
+                            success_payload,
+                        )
+                        .emit();
 
                         Ok(ComplexResource::Dolphin(complex))
                     }
                     Err((s, r1, r2)) => {
-                        // let fail_payload = Payload::from([
-                        //     ("error".to_string(), "combine_failed".to_string()),
-                        //     ("request_type".to_string(), "Dolphin".to_string()),
-                        //     ("error_message".to_string(), s.clone()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     fail_payload,
-                        // )
-                        // .emit();
+                        let fail_payload = Payload::from([
+                            ("error".to_string(), "combine_failed".to_string()),
+                            ("request_type".to_string(), "Dolphin".to_string()),
+                            ("error_message".to_string(), s.clone()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            fail_payload,
+                        )
+                        .emit();
 
                         Err((
                             s,
@@ -1009,20 +1179,24 @@ impl EnterpriseAi {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        // let error_payload = Payload::from([
-                        //     ("error".to_string(), "no_energy_cell_available".to_string()),
-                        //     ("request_type".to_string(), "Life".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     error_payload,
-                        // )
-                        // .emit();
+                        let error_payload = Payload::from([
+                            ("error".to_string(), "no_energy_cell_available".to_string()),
+                            ("request_type".to_string(), "Life".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            error_payload,
+                        )
+                        .emit();
 
                         return Err((
                             "No energy cell available".to_string(),
@@ -1036,39 +1210,47 @@ impl EnterpriseAi {
 
                 match complex {
                     Ok(complex) => {
-                        // let success_payload = Payload::from([
-                        //     ("action".to_string(), "combine_success".to_string()),
-                        //     ("resource".to_string(), "Life".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Info,
-                        //     success_payload,
-                        // )
-                        // .emit();
+                        let success_payload = Payload::from([
+                            ("action".to_string(), "combine_success".to_string()),
+                            ("resource".to_string(), "Life".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Info,
+                            success_payload,
+                        )
+                        .emit();
 
                         Ok(ComplexResource::Life(complex))
                     }
                     Err((s, r1, r2)) => {
-                        // let fail_payload = Payload::from([
-                        //     ("error".to_string(), "combine_failed".to_string()),
-                        //     ("request_type".to_string(), "Life".to_string()),
-                        //     ("error_message".to_string(), s.clone()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     fail_payload,
-                        // )
-                        // .emit();
+                        let fail_payload = Payload::from([
+                            ("error".to_string(), "combine_failed".to_string()),
+                            ("request_type".to_string(), "Life".to_string()),
+                            ("error_message".to_string(), s.clone()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            fail_payload,
+                        )
+                        .emit();
 
                         Err((
                             s,
@@ -1083,20 +1265,24 @@ impl EnterpriseAi {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        // let error_payload = Payload::from([
-                        //     ("error".to_string(), "no_energy_cell_available".to_string()),
-                        //     ("request_type".to_string(), "Robot".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     error_payload,
-                        // )
-                        // .emit();
+                        let error_payload = Payload::from([
+                            ("error".to_string(), "no_energy_cell_available".to_string()),
+                            ("request_type".to_string(), "Robot".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            error_payload,
+                        )
+                        .emit();
 
                         return Err((
                             "No energy cell available".to_string(),
@@ -1110,39 +1296,47 @@ impl EnterpriseAi {
 
                 match complex {
                     Ok(complex) => {
-                        // let success_payload = Payload::from([
-                        //     ("action".to_string(), "combine_success".to_string()),
-                        //     ("resource".to_string(), "Robot".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Info,
-                        //     success_payload,
-                        // )
-                        // .emit();
+                        let success_payload = Payload::from([
+                            ("action".to_string(), "combine_success".to_string()),
+                            ("resource".to_string(), "Robot".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Info,
+                            success_payload,
+                        )
+                        .emit();
 
                         Ok(ComplexResource::Robot(complex))
                     }
                     Err((s, r1, r2)) => {
-                        // let fail_payload = Payload::from([
-                        //     ("error".to_string(), "combine_failed".to_string()),
-                        //     ("request_type".to_string(), "Robot".to_string()),
-                        //     ("error_message".to_string(), s.clone()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     fail_payload,
-                        // )
-                        // .emit();
+                        let fail_payload = Payload::from([
+                            ("error".to_string(), "combine_failed".to_string()),
+                            ("request_type".to_string(), "Robot".to_string()),
+                            ("error_message".to_string(), s.clone()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            fail_payload,
+                        )
+                        .emit();
 
                         Err((
                             s,
@@ -1157,20 +1351,24 @@ impl EnterpriseAi {
                 let energy_cell = match state.full_cell() {
                     Some((c, _)) => c,
                     None => {
-                        // let error_payload = Payload::from([
-                        //     ("error".to_string(), "no_energy_cell_available".to_string()),
-                        //     ("request_type".to_string(), "Water".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     error_payload,
-                        // )
-                        // .emit();
+                        let error_payload = Payload::from([
+                            ("error".to_string(), "no_energy_cell_available".to_string()),
+                            ("request_type".to_string(), "Water".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            error_payload,
+                        )
+                        .emit();
 
                         return Err((
                             "No energy cell available".to_string(),
@@ -1184,39 +1382,47 @@ impl EnterpriseAi {
 
                 match complex {
                     Ok(complex) => {
-                        // let success_payload = Payload::from([
-                        //     ("action".to_string(), "combine_success".to_string()),
-                        //     ("resource".to_string(), "Water".to_string()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Info,
-                        //     success_payload,
-                        // )
-                        // .emit();
+                        let success_payload = Payload::from([
+                            ("action".to_string(), "combine_success".to_string()),
+                            ("resource".to_string(), "Water".to_string()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Info,
+                            success_payload,
+                        )
+                        .emit();
 
                         Ok(ComplexResource::Water(complex))
                     }
                     Err((s, r1, r2)) => {
-                        // let fail_payload = Payload::from([
-                        //     ("error".to_string(), "combine_failed".to_string()),
-                        //     ("request_type".to_string(), "Water".to_string()),
-                        //     ("error_message".to_string(), s.clone()),
-                        // ]);
-                        // LogEvent::new(
-                        //     ActorType::Planet,
-                        //     self.planet_id,
-                        //     ActorType::SelfActor,
-                        //     "self".to_string(),
-                        //     EventType::InternalPlanetAction,
-                        //     Channel::Error,
-                        //     fail_payload,
-                        // )
-                        // .emit();
+                        let fail_payload = Payload::from([
+                            ("error".to_string(), "combine_failed".to_string()),
+                            ("request_type".to_string(), "Water".to_string()),
+                            ("error_message".to_string(), s.clone()),
+                        ]);
+                        LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: self.planet_id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: self.planet_id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            fail_payload,
+                        )
+                        .emit();
 
                         Err((
                             s,
@@ -1308,7 +1514,6 @@ mod tests {
         assert!(!state.has_rocket()); // The initial planet state shouldn't have a built rocket
         assert!(state.can_have_rocket()); // C-type planets can have a rocket
     }
-
 
     #[test]
     fn start_orchestrator() {
