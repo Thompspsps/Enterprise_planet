@@ -27,6 +27,19 @@ If a sunray arrives while the energy cell is already charged, the planet will at
 #### Emergency Defense
 If an asteroid is approaching and the planet doesn’t have a rocket, it will use the available energy to construct an emergency rocket, prioritizing the planet’s survival at all costs.
 
+## Add Enterprise as a Dependency
+
+In order to add Enterprise as a dependency, write the following lines on Cargo.toml.
+```
+[dependencies]
+enterprise = {git = "https://github.com/Thompspsps/Enterprise_planet.git"}
+```
+
+## Creating the Planet
+```
+enterprise::create_planet(id, rx_orchestrator, tx_orchestrator, rx_explorer)
+```
+
 ## Client Support
 
 You can contact us in our [Telegram group chat](https://t.me/+IJlWkyHqlq9mOWJk).
