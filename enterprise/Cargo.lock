@@ -4,9 +4,9 @@ version = 4
 
 [[package]]
 name = "common-game"
-version = "3.0.0-rc.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a805e7d9d61376a2cdcf840bd5bd08e81468cb325546dc51d5adea1985d9d918"
+checksum = "288def5b45036a2fe3d7ba745c0f0e40b18b5e96164cc139fa220485509e701e"
 dependencies = [
  "crossbeam-channel",
  "enum-as-inner",
