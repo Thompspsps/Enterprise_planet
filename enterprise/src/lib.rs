@@ -43,7 +43,7 @@ impl PlanetAI for EnterpriseAi {
 
         let mut payload = Payload::from([
             (
-                "visiting_explorers".to_string(),
+                "explorer_count".to_string(),
                 self.num_explorers.to_string(),
             ),
             ("has_rocket".to_string(), state.has_rocket().to_string()),
@@ -63,7 +63,7 @@ impl PlanetAI for EnterpriseAi {
                 id: ORCHESTRATOR,
             }),
             EventType::MessageOrchestratorToPlanet,
-            Channel::Info,
+            Channel::Trace,
             Payload::from([("action".to_string(), "sunray_ack".to_string())]),
         )
         .emit();
@@ -90,7 +90,7 @@ impl PlanetAI for EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Info,
+                            Channel::Debug,
                             Payload::from([("action".to_string(), "built_rocket".to_string())]),
                         )
                         .emit();
@@ -177,7 +177,7 @@ impl PlanetAI for EnterpriseAi {
                                         id: self.planet_id,
                                     }),
                                     EventType::InternalPlanetAction,
-                                    Channel::Warning,
+                                    Channel::Debug,
                                     Payload::from([(
                                         "action".to_string(),
                                         "has_built_rocket_with_new_energy_cell".to_string(),
@@ -241,7 +241,7 @@ impl PlanetAI for EnterpriseAi {
                 id: ORCHESTRATOR,
             }),
             EventType::MessageOrchestratorToPlanet,
-            Channel::Info,
+            Channel::Trace,
             payload,
         )
         .emit();
@@ -314,7 +314,7 @@ impl PlanetAI for EnterpriseAi {
                         id: self.planet_id,
                     }),
                     EventType::InternalPlanetAction,
-                    Channel::Info,
+                    Channel::Debug,
                     payload,
                 )
                 .emit();
@@ -325,7 +325,7 @@ impl PlanetAI for EnterpriseAi {
                     state.build_rocket(at).unwrap();
                 } else {
                     let payload = Payload::from([(
-                        "warning".to_string(),
+                        "no defense".to_string(),
                         "no_charged_cell_for_rocket".to_string(),
                     )]);
                     LogEvent::new(
@@ -338,7 +338,7 @@ impl PlanetAI for EnterpriseAi {
                             id: self.planet_id,
                         }),
                         EventType::InternalPlanetAction,
-                        Channel::Warning,
+                        Channel::Debug,
                         payload,
                     )
                     .emit();
@@ -378,7 +378,7 @@ impl PlanetAI for EnterpriseAi {
                 id: self.planet_id,
             }),
             EventType::MessageExplorerToPlanet,
-            Channel::Info,
+            Channel::Trace,
             incoming_payload,
         )
         .emit();
@@ -402,7 +402,7 @@ impl PlanetAI for EnterpriseAi {
                 payload,
             )
             .emit();
-            return Some(PlanetToExplorer::Stopped); // from the documentation "This variant is used by planets that are currently in a stopped state to acknowledge any message coming from an explorer"
+            return Some(PlanetToExplorer::Stopped);
         }
 
         match msg {
@@ -428,7 +428,7 @@ impl PlanetAI for EnterpriseAi {
                         id: self.planet_id,
                     }),
                     EventType::MessageExplorerToPlanet,
-                    Channel::Info,
+                    Channel::Debug,
                     payload,
                 )
                 .emit();
@@ -467,7 +467,7 @@ impl PlanetAI for EnterpriseAi {
                         id: self.planet_id,
                     }),
                     EventType::MessageExplorerToPlanet,
-                    Channel::Info,
+                    Channel::Debug,
                     payload,
                 )
                 .emit();
@@ -498,7 +498,7 @@ impl PlanetAI for EnterpriseAi {
                         id: self.planet_id,
                     }),
                     EventType::MessageExplorerToPlanet,
-                    Channel::Info,
+                    Channel::Debug,
                     payload,
                 )
                 .emit();
@@ -530,7 +530,7 @@ impl PlanetAI for EnterpriseAi {
                 id: ORCHESTRATOR,
             }),
             EventType::MessageOrchestratorToPlanet,
-            Channel::Info,
+            Channel::Debug,
             payload,
         )
         .emit();
@@ -538,7 +538,7 @@ impl PlanetAI for EnterpriseAi {
         let payload = Payload::from([
             ("in_explorer_id".to_string(), explorer_id.to_string()),
             (
-                "visiting_explorers".to_string(),
+                "explorer_count".to_string(),
                 self.num_explorers.to_string(),
             ),
         ]);
@@ -582,7 +582,7 @@ impl PlanetAI for EnterpriseAi {
                     id: self.planet_id,
                 }),
                 EventType::InternalExplorerAction,
-                Channel::Debug,
+                Channel::Warning,
                 payload,
             )
             .emit();
@@ -600,7 +600,7 @@ impl PlanetAI for EnterpriseAi {
                 id: ORCHESTRATOR,
             }),
             EventType::MessageOrchestratorToPlanet,
-            Channel::Info,
+            Channel::Debug,
             payload,
         )
         .emit();
@@ -608,7 +608,7 @@ impl PlanetAI for EnterpriseAi {
         let payload = Payload::from([
             ("out_explorer_id".to_string(), explorer_id.to_string()),
             (
-                "visiting_explorers".to_string(),
+                "explorer_count".to_string(),
                 self.num_explorers.to_string(),
             ),
         ]);
@@ -822,7 +822,7 @@ impl EnterpriseAi {
                             id: self.planet_id,
                         }),
                         EventType::InternalPlanetAction,
-                        Channel::Info,
+                        Channel::Debug,
                         payload,
                     )
                     .emit();
@@ -860,63 +860,6 @@ impl EnterpriseAi {
         combinator: &Combinator,
         state: &mut PlanetState,
     ) -> Result<ComplexResource, (String, GenericResource, GenericResource)> {
-        let request_type = match &request {
-            ComplexResourceRequest::Water(_, _) => "Water",
-            ComplexResourceRequest::Diamond(_, _) => "Diamond",
-            ComplexResourceRequest::Life(_, _) => "Life",
-            ComplexResourceRequest::Robot(_, _) => "Robot",
-            ComplexResourceRequest::Dolphin(_, _) => "Dolphin",
-            ComplexResourceRequest::AIPartner(_, _) => "AIPartner",
-        };
-
-        //Do we need that part? Because I think this is already done bellow... We always check if there is an energy cell
-
-        match state.full_cell() {
-            Some((_, i)) => {
-                let cell_payload = Payload::from([
-                    ("action".to_string(), "found_charged_cell".to_string()),
-                    ("cell_index".to_string(), i.to_string()),
-                    ("request_type".to_string(), request_type.to_string()),
-                ]);
-                LogEvent::new(
-                    Some(Participant {
-                        actor_type: ActorType::Planet,
-                        id: self.planet_id,
-                    }),
-                    Some(Participant {
-                        actor_type: ActorType::SelfActor,
-                        id: self.planet_id,
-                    }),
-                    EventType::InternalPlanetAction,
-                    Channel::Debug,
-                    cell_payload,
-                )
-                .emit();
-            }
-            None => {
-                let no_cell_payload = Payload::from([
-                    (
-                        "action".to_string(),
-                        "no_charged_cell_for_combine".to_string(),
-                    ),
-                    ("request_type".to_string(), request_type.to_string()),
-                ]);
-                LogEvent::new(
-                    Some(Participant {
-                        actor_type: ActorType::Planet,
-                        id: self.planet_id,
-                    }),
-                    Some(Participant {
-                        actor_type: ActorType::SelfActor,
-                        id: self.planet_id,
-                    }),
-                    EventType::InternalPlanetAction,
-                    Channel::Warning,
-                    no_cell_payload,
-                )
-                .emit();
-            }
-        }
 
         match request {
             // The "AIPartner" complex resource takes Robot + Diamond
@@ -970,7 +913,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Info,
+                            Channel::Debug,
                             success_payload,
                         )
                         .emit();
@@ -1056,7 +999,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Info,
+                            Channel::Debug,
                             success_payload,
                         )
                         .emit();
@@ -1142,7 +1085,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Info,
+                            Channel::Debug,
                             success_payload,
                         )
                         .emit();
@@ -1228,7 +1171,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Info,
+                            Channel::Debug,
                             success_payload,
                         )
                         .emit();
@@ -1314,7 +1257,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Info,
+                            Channel::Debug,
                             success_payload,
                         )
                         .emit();
@@ -1400,7 +1343,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Info,
+                            Channel::Debug,
                             success_payload,
                         )
                         .emit();
@@ -1441,6 +1384,7 @@ impl EnterpriseAi {
 
 }
 
+/// Function used to create an Enterprise planet. It panics if it was not possible to create the planet
 pub fn create_planet(
         id: u32,
         rx_orchestrator: Receiver<OrchestratorToPlanet>,
@@ -1469,6 +1413,6 @@ pub fn create_planet(
             rx_explorer,
         ) {
             Ok(planet) => planet,
-            Err(error) => panic!("{error}"), // Need to handle properly error case
+            Err(error) => panic!("{error}"), //TODO
         }
     }
