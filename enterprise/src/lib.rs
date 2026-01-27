@@ -21,7 +21,7 @@ pub struct EnterpriseAi {
     planet_id: u32,    // This parameter represents the planet ID (used for logging purposes)
 }
 
-const ORCHESTRATOR: &str = "orchestrator";
+const ORCHESTRATOR: u32 = 0;
 
 impl PlanetAI for EnterpriseAi {
     fn handle_sunray(
@@ -60,7 +60,7 @@ impl PlanetAI for EnterpriseAi {
             }),
             Some(Participant {
                 actor_type: ActorType::Orchestrator,
-                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+                id: ORCHESTRATOR,
             }),
             EventType::MessageOrchestratorToPlanet,
             Channel::Info,
@@ -238,7 +238,7 @@ impl PlanetAI for EnterpriseAi {
             }),
             Some(Participant {
                 actor_type: ActorType::Orchestrator,
-                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+                id: ORCHESTRATOR,
             }),
             EventType::MessageOrchestratorToPlanet,
             Channel::Info,
@@ -527,7 +527,7 @@ impl PlanetAI for EnterpriseAi {
             }),
             Some(Participant {
                 actor_type: ActorType::Orchestrator,
-                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+                id: ORCHESTRATOR,
             }),
             EventType::MessageOrchestratorToPlanet,
             Channel::Info,
@@ -597,7 +597,7 @@ impl PlanetAI for EnterpriseAi {
             }),
             Some(Participant {
                 actor_type: ActorType::Orchestrator,
-                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+                id: ORCHESTRATOR,
             }),
             EventType::MessageOrchestratorToPlanet,
             Channel::Info,
@@ -687,7 +687,7 @@ impl EnterpriseAi {
         LogEvent::new(
             Some(Participant {
                 actor_type: ActorType::Orchestrator,
-                id: LogEvent::id_from_str(ORCHESTRATOR) as u32,
+                id: ORCHESTRATOR,
             }),
             Some(Participant {
                 actor_type: ActorType::Planet,
