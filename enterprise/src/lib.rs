@@ -582,7 +582,7 @@ impl PlanetAI for EnterpriseAi {
                     id: self.planet_id,
                 }),
                 EventType::InternalExplorerAction,
-                Channel::Warning,
+                Channel::Error,
                 payload,
             )
             .emit();
@@ -733,7 +733,7 @@ impl EnterpriseAi {
 
     fn handle_resource_request(
         &mut self,
-        _explorer_id: u32, //Should we use explorer_id in the log?
+        _explorer_id: u32,
         request: BasicResourceType,
         generator: &Generator,
         state: &mut PlanetState,
@@ -775,7 +775,7 @@ impl EnterpriseAi {
                             id: self.planet_id,
                         }),
                         EventType::InternalPlanetAction,
-                        Channel::Debug,
+                        Channel::Trace,
                         payload,
                     )
                     .emit();
@@ -794,7 +794,7 @@ impl EnterpriseAi {
                             id: self.planet_id,
                         }),
                         EventType::InternalPlanetAction,
-                        Channel::Warning,
+                        Channel::Debug,
                         payload,
                     )
                     .emit();
@@ -843,7 +843,7 @@ impl EnterpriseAi {
                             id: self.planet_id,
                         }),
                         EventType::InternalPlanetAction,
-                        Channel::Error,
+                        Channel::Debug,
                         payload,
                     )
                     .emit();
@@ -882,7 +882,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             error_payload,
                         )
                         .emit();
@@ -936,7 +936,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             fail_payload,
                         )
                         .emit();
@@ -968,7 +968,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             error_payload,
                         )
                         .emit();
@@ -1022,7 +1022,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             fail_payload,
                         )
                         .emit();
@@ -1054,7 +1054,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             error_payload,
                         )
                         .emit();
@@ -1108,7 +1108,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             fail_payload,
                         )
                         .emit();
@@ -1140,7 +1140,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             error_payload,
                         )
                         .emit();
@@ -1194,7 +1194,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             fail_payload,
                         )
                         .emit();
@@ -1226,7 +1226,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             error_payload,
                         )
                         .emit();
@@ -1280,7 +1280,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             fail_payload,
                         )
                         .emit();
@@ -1312,7 +1312,7 @@ impl EnterpriseAi {
                                 id: self.planet_id,
                             }),
                             EventType::InternalPlanetAction,
-                            Channel::Error,
+                            Channel::Debug,
                             error_payload,
                         )
                         .emit();
@@ -1412,7 +1412,48 @@ pub fn create_planet(
             (rx_orchestrator, tx_orchestrator),
             rx_explorer,
         ) {
-            Ok(planet) => planet,
-            Err(error) => panic!("{error}"), //TODO
+            Ok(planet) => {
+                let payload = Payload::from([
+                            ("action".to_string(), "create_planet".to_string()),
+                            ("planet_id".to_string(), id.to_string()),
+                        ]);
+
+                LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Info,
+                            payload,
+                        )
+                        .emit();
+                return planet;},
+            Err(error) => {
+                let payload = Payload::from([
+                            ("action".to_string(), "create_planet".to_string()),
+                            ("planet_id".to_string(), id.to_string()),
+                            ("error".to_string(), error.to_string())
+                        ]);
+
+                LogEvent::new(
+                            Some(Participant {
+                                actor_type: ActorType::Planet,
+                                id: id,
+                            }),
+                            Some(Participant {
+                                actor_type: ActorType::SelfActor,
+                                id: id,
+                            }),
+                            EventType::InternalPlanetAction,
+                            Channel::Error,
+                            payload,
+                        )
+                        .emit();
+                panic!("{error}")},
         }
     }
